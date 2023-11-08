@@ -1,0 +1,22 @@
+{
+  "name": "c_interpreter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "c_lang.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sudahiroshi/c_interpreter.git"
+  },
+  "author": "Hiroshi Suda",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sudahiroshi/c_interpreter/issues"
+  },
+  "homepage": "https://github.com/sudahiroshi/c_interpreter#readme",
+  "dependencies": {
+    "pegjs": "^0.10.0"
+  }
+}
