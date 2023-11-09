@@ -15,4 +15,45 @@ const source = fs.readFileSync( process.argv[2], "utf-8" );
 let parser = pegjs.generate( ruleset );
 let ast = parser.parse( source );
 
-console.log( ast.body[1] );
+console.log( ast );
+
+const TYPE = {
+    VARIABLE: "Variable",
+    FUNCTION: "Function",
+    BLOCK: "Block"
+}
+
+const global = {};
+const func = {};
+
+function interprit( ast ) {
+    let last = null;
+    switch( ast["type"] ) {
+        case "Program":
+            for( let line of ast["body"] ) {
+                interprit( line );
+            }
+            break;
+        case "Include":
+            console.log( ast["standardheader"] );
+            console.log("include " + line["standardheader"] );
+            break;
+        case "function":
+            console.log( ast["name"] );
+            func[ ast["name"] ] = { block: ast["block"], parameter: ast["parameter"] } ;
+            
+    }
+}
+
+switch( ast["type"] ) {
+    case "Program":
+        for( let line of ast["body"] ) {
+            console.log( line["type"] );
+            switch( line["type"] ) {
+                case "Include":
+                    console.log("include " + line["standardheader"] );
+
+                    
+            }
+        }
+}
