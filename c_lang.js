@@ -15,7 +15,7 @@ const source = fs.readFileSync( process.argv[2], "utf-8" );
 let parser = pegjs.generate( ruleset );
 let ast = parser.parse( source );
 
-console.log( ast );
+//console.log( ast );
 
 const TYPE = {
     VARIABLE: "Variable",
@@ -25,35 +25,44 @@ const TYPE = {
 
 const global = {};
 const func = {};
+func[ "printf" ] = ( arg ) => { console.log( 28, arg[0].value ); };
 
 function interprit( ast ) {
     let last = null;
     switch( ast["type"] ) {
         case "Program":
-            for( let line of ast["body"] ) {
+            console.log( 34, ast.body );
+            for( let line of ast.body ) {
                 interprit( line );
             }
             break;
         case "Include":
+            console.log( 40, ast );
             console.log( ast["standardheader"] );
-            console.log("include " + line["standardheader"] );
+            console.log(41, "include " + ast["standardheader"] );
             break;
-        case "function":
-            console.log( ast["name"] );
-            func[ ast["name"] ] = { block: ast["block"], parameter: ast["parameter"] } ;
-            
+        case "FunctionExecution":
+            if( func[ ast["name"] ] ){
+                console.log( 46, ast["name"] );
+                console.log( 47, ast.parameter );
+                let f = func[ ast["name"] ];
+                f( ast["parameter"] );
+            }
+            break;
+        case "FunctionDefinition":
+            console.log( 52, ast["name"] );
+            console.log( 53, ast.block );
+            func[ ast["name"] ] = () => interprit( ast.block );
+            break;
+        case "block":
+            console.log( 56, ast );
+            for( let line of ast.stmt ) {
+                interprit( line );
+            }
+            break;
     }
 }
 
-switch( ast["type"] ) {
-    case "Program":
-        for( let line of ast["body"] ) {
-            console.log( line["type"] );
-            switch( line["type"] ) {
-                case "Include":
-                    console.log("include " + line["standardheader"] );
-
-                    
-            }
-        }
-}
+interprit( ast );
+console.log( 59, func["main"] );
+func[ "main" ]();
