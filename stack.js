@@ -23,21 +23,26 @@ class Stack {
             this.sp--;
         }
         this.access[size].set( [data], this.sp/(size/8) );
+        console.log( this.access[size] );
     }
     pop( size ) {
         let data = this.access[size].at( this.sp/(size/8) );
         this.sp += size/8;
         return data;
     }
+    get( address, size ) {
+        return this.access[size].at( address/(size/8) );
+    }
 }
 
 const st = new Stack( 16 );
-console.log( st );
+//console.log( st );
 st.push( 0x10101010, 32 );
-console.log( st );
-console.log( st.pop( 32 ) );
+// console.log( st );
+// console.log( st.pop( 32 ) );
 st.push( 0x0f0f0f0f, 32 );
 st.push( 0xffff, 16 );
-console.log( st );
+// console.log( st );
 st.push( 0x20202020, 32 );
-console.log( st );
+// console.log( st );
+// console.log( st.get( 8, 32 ) );

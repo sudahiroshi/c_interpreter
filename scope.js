@@ -56,6 +56,7 @@ class Scope {
         }
 
         stack.push( val, this.vars[name]["size"] );
+        console.log( 59, this.stack.sp );
         this.vars[name]["sp"] = this.stack.sp;
     }
     getvar( name ) {
@@ -77,5 +78,5 @@ let scope = new Scope( null, stack );
 scope.newvar( "test", 'int' );
 console.log( scope );
 scope.setvar( "test", 8 );
-console.log( scope );
-console.log( scope.getvar( "test" ));
+console.log( scope.vars );
+console.log( 82, scope.getvar( "test" ));
