@@ -49,7 +49,7 @@ class Stack {
      */
     get( address, size ) {
         let dummy = this.access[size].at( address/(size/8) );
-        console.log( "Stack.get", address, size, this.access[size].at( address/(size/8) ) );
+        // console.log( "Stack.get", address, size, this.access[size].at( address/(size/8) ) );
         return dummy;
     }
     /**
@@ -70,7 +70,7 @@ class Scope {
         this.parent = parent;
         this.stack = stack;
         this.vars = {};
-        console.log( "Scope.new", stack.sp );
+        // console.log( "Scope.new", stack.sp );
     }
     /**
      * 新しい変数を定義する
@@ -96,7 +96,7 @@ class Scope {
         }
         stack.push( val, this.vars[name]["size"] );
         this.vars[name]["sp"] = this.stack.sp;
-        console.log( 80, name, this.vars[name], stack.sp );
+        // console.log( 80, name, this.vars[name], stack.sp );
     }
     /**
      * 変数の値を取得する
@@ -105,10 +105,10 @@ class Scope {
      */
     getvar( name ) {
         if( this.vars[name] ) {
-            console.log( 81, stack.u32 );
-            console.log( 76, this.vars );
+            // console.log( 81, stack.u32 );
+            // console.log( 76, this.vars );
             let dummy = this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
-            console.log( "Scope.getvar", name, dummy );
+            // console.log( "Scope.getvar", name, dummy );
             return this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
         } else {
             console.log( 78, "name error!" );
@@ -147,21 +147,21 @@ const global = {};
 const func = {};
 func[ "printf" ] = ( arg ) => { console.log( 28, arg ); };
 func[ "print" ] = ( arg, scope ) => {
-     console.log( 122, arg );
+    console.log( stack.get( stack.sp, 32) );
     // console.log( 105, scope );
     // console.log( 106, stack.sp );
     //console.log( stack.get( stack.sp, 32 ) );
     // console.log( 108, stack.u32 );
 }
 func[ "pp" ] = ( arg, scope ) => {
-    console.log( 129, stack.get( stack.sp, 32) );
+    console.log( arg );
 }
 
 function interprit( ast, scope ) {
     let last = null;
     switch( ast["type"] ) {
         case "Program":
-            console.log( 34, ast.body );
+            // console.log( 34, ast.body );
             for( let line of ast.body ) {
                 interprit( line, scope );
             }
@@ -177,24 +177,28 @@ function interprit( ast, scope ) {
                 // console.log( 46, ast["name"] );
                 // console.log( 47, ast.parameter );
                 let f = func[ ast["name"] ];
-                console.log( 84, stack.sp );
+                // console.log( 84, stack.sp );
                 const backup = stack.sp;
-                for( let i of ast.parameter ) {
-                    console.log( 120, i );
-                    // console.log( 137, scope.vars );
-                    // let dummy = scope.getvar( i.name );
-                    let dummy = interprit( i, scope );
-                    console.log( 140, dummy );
-                    stack.push( dummy, 32 );
-                    // console.log( 139, stack.get( 52, 32 ) );
-                    // console.log( 136, scope.getvar( i.name ) );
+                if( ast.parameter ) {
+                    for( let i of ast.parameter ) {
+                        // console.log( 120, i );
+                        // console.log( 137, scope.vars );
+                        // let dummy = scope.getvar( i.name );
+                        let dummy = interprit( i, scope );
+                        // console.log( 140, dummy );
+                        stack.push( dummy, 32 );
+                        // console.log( 139, stack.get( 52, 32 ) );
+                        // console.log( 136, scope.getvar( i.name ) );
+                    }
+                } else {
+                    ast.parameter = [];
                 }
                 // console.log( 88, stack.sp );
-                console.log( 166, ast["parameter"] );
+                // console.log( 166, ast["parameter"] );
                 let result = f( scope, ast["parameter"].length );
-                console.log( 168, result );
+                // console.log( 168, result );
                 stack.sp = backup;
-                console.log( 169, stack.sp );
+                // console.log( 169, stack.sp );
                 return result;
             }
             break;
@@ -205,16 +209,18 @@ function interprit( ast, scope ) {
                 let sc = new Scope( parent, stack );
                 const backup = stack.sp;
                 // console.log( 143, ast );
-                let offset = 32 * (param_num-1);
-                for( variable of ast["parameter"] ) {
-                    console.log( "FuncDef", variable.value.name, variable.model, backup + (offset/8), stack.get( backup + (offset/8), 32) );
-                    sc.newvar( variable.value.name, variable.model, stack.get( backup + (offset/8), 32) );
-                    offset -= 32;
+                if( ast["parameter"] ) {
+                    let offset = 32 * (param_num-1);
+                    for( let variable of ast["parameter"] ) {
+                        // console.log( "FuncDef", variable.value.name, variable.model, backup + (offset/8), stack.get( backup + (offset/8), 32) );
+                        sc.newvar( variable.value.name, variable.model, stack.get( backup + (offset/8), 32) );
+                        offset -= 32;
+                    }
                 }
                 // console.log( 156, sc.vars );
                 // console.log( 157, stack.get( 32, 32 ) );
                 let result = interprit( ast.block, sc );
-                console.log( 189, result );
+                // console.log( 189, result );
                 return result;
             }
             break;
@@ -223,7 +229,7 @@ function interprit( ast, scope ) {
             let block_result;
             for( let line of ast.stmt ) {
                 block_result = interprit( line, scope );
-                console.log( "block", block_result );
+                // console.log( "block", block_result );
             }
             return block_result;
             break;
@@ -264,7 +270,7 @@ function interprit( ast, scope ) {
             return result;
             break;
         case "Literal":
-            console.log( 163, "literal", ast["value"] );
+            // console.log( 163, "literal", ast["value"] );
             return ast["value"];
             break;
         case "expr":
@@ -273,20 +279,20 @@ function interprit( ast, scope ) {
         case "returnStatement":
 
             let dummy = interprit( ast["value"], scope );
-            console.log( "retStat", ast["value"], dummy );
+            // console.log( "retStat", ast["value"], dummy );
             return dummy;
             break;
         case "BinaryExpression":
-            console.log( 231, ast );
-            console.log( 239, stack.u32 );
-            console.log( 240, scope.vars );
+            // console.log( 231, ast );
+            // console.log( 239, stack.u32 );
+            // console.log( 240, scope.vars );
             let left = interprit( ast["left"], scope );
-            console.log( 236, left );
+            // console.log( 236, left );
             let right = interprit( ast["right"], scope );
-            console.log( 247, right );
+            // console.log( 247, right );
             switch( ast["operator"] ) {
                 case "+":
-                    console.log( 244, left, right, left + right );
+                    // console.log( 244, left, right, left + right );
                     return left + right;
                     break;
                 case "-":
@@ -302,7 +308,7 @@ function interprit( ast, scope ) {
         case "Identifier":
             //console.log( 249, scope );
             let res = scope.getvar( ast["name"] );
-            console.log( 255, res );
+            // console.log( 255, res );
             return res;
             break;
 
@@ -314,4 +320,4 @@ interprit( ast, grobal );
 // console.log( 108, func );
 // stack.push( 0, 32 );
 // stack.push( 0, 32 );
-func[ "main" ]( grobal, 2 );
+func[ "main" ]( grobal, 0 );
