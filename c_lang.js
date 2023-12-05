@@ -36,6 +36,11 @@ class Stack {
         // console.log( 36, size, data );
         // console.log( this.access[size] );
     }
+    /**
+     * スタックからデータを取り出す（SPを変更する）
+     * @param { number } size スタックから取り出すデータのサイズ（ビット）
+     * @returns データ
+     */
     pop( size ) {
         let data = this.access[size].at( this.sp/(size/8) );
         this.sp += size/8;
@@ -59,10 +64,17 @@ class Stack {
      * @param { number } value 値
      */
     set( address, size, value ) {
-        // console.log( 48, address, size, value );
+        console.log( 48, address, size, value );
         this.access[size].set( [value], address/(size/8) );
         // console.log( this.access[size] );
     }
+}
+
+const models = {
+    'int': 32,
+    'long': 32,
+    'short': 16,
+    'char': 8
 }
 
 class Scope {
@@ -99,14 +111,43 @@ class Scope {
         // console.log( 80, name, this.vars[name], stack.sp );
     }
     /**
+     * 新しい配列を定義する
+     * @param { String } name 配列名
+     * @param { String } model 型名
+     * @param { number } length 要素数
+     */
+    newarray( name, model, length ) {
+        this.vars[name] = {};
+        this.vars[name]["length"] = length;
+        switch( model ) {
+            case 'int':
+            case 'long':
+                this.vars[name]["size"] = 32;
+                break;
+            case 'short':
+                this.vars[name]["size"] = 16;
+                break;
+            case 'char':
+                this.vars[name]["size"] = 8;
+                break;
+            default:
+                throw new Error('変数のサイズがおかしいです');
+        }
+        for( let i=0; i<length; i++ ) {
+            stack.push( 0, this.vars[name]["size"] );
+        }
+        this.vars[name]["sp"] = this.stack.sp;
+    }
+    /**
      * 変数の値を取得する
      * @param { String } name 変数名
      * @returns 
      */
     getvar( name ) {
+        console.log( 76, this.vars );
         if( this.vars[name] ) {
             // console.log( 81, stack.u32 );
-            // console.log( 76, this.vars );
+
             let dummy = this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
             // console.log( "Scope.getvar", name, dummy );
             return this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
@@ -115,12 +156,18 @@ class Scope {
         }
     }
 
+    /**
+     * 変数に値を代入する
+     * @param { String } name 変数名
+     * @param {*} value 値
+     */
     setvar( name, value ) {
+        console.log( 165, name, value );
         if( this.vars[name] ) {
             this.stack.set( this.vars[name]["sp"], this.vars[name]["size"], value );
             //this.stack[ this.vars[name]["sp"] ] = value;
         } else {
-            console.log( 78, "name error!" );
+            console.log( 169, "name error!" );
         }       
     }
 }
@@ -161,7 +208,7 @@ function interprit( ast, scope ) {
     let last = null;
     switch( ast["type"] ) {
         case "Program":
-            // console.log( 34, ast.body );
+            console.log( 34, ast.body );
             for( let line of ast.body ) {
                 interprit( line, scope );
             }
@@ -225,7 +272,7 @@ function interprit( ast, scope ) {
             }
             break;
         case "block":
-            // console.log( 56, ast );
+            console.log( "block", ast );
             let block_result;
             for( let line of ast.stmt ) {
                 block_result = interprit( line, scope );
@@ -258,7 +305,7 @@ function interprit( ast, scope ) {
             }
             break;
         case "AssignmentExpression":
-            // console.log( 155, ast );
+            console.log( 155, ast );
             let result = interprit( ast["right"], scope );
             // console.log( 197, result );
             scope.setvar( ast["left"]["name"], result );
@@ -310,6 +357,42 @@ function interprit( ast, scope ) {
             let res = scope.getvar( ast["name"] );
             // console.log( 255, res );
             return res;
+            break;
+        case "array":
+            console.log( ast );
+
+            if( ast["model"] ) {    // ast["model"]がある場合は配列定義
+                let length;
+                let name;
+                if( ast["value"] ) {
+                    name = ast["value"]["name"];
+                } else { 
+                    name = ast["left"]["name"];
+                }
+                if( ast["length"] ) {
+                    length = interprit( ast["length"], scope );
+                } else if( ast["right"] ) {
+                    length = ast["right"].length;
+                }
+                console.log( 362, length );
+                scope.newarray( name, ast["model"], length );
+
+                if( ast["right"] ) {
+                    for( let i in ast["right"] ) {
+                        console.log( 379, scope.vars[name] );
+                        console.log( 380, ast["right"][i] );
+                        stack.set( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["right"][i], scope ));
+                    }
+                }
+            } else {    // ast["model"]がない場合は配列を使う
+                let name = ast["left"]["name"];
+                let size = scope.vars[name].size;
+                let sp = scope.vars[name].sp;
+                let seq = ast["row"]["value"];
+                console.log( 389, scope.vars[name], size );
+                let dummy = stack.get( sp + (seq * size)/8, size );
+                console.log( dummy );
+            }
             break;
 
     }
