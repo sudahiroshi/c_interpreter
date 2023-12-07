@@ -1,6 +1,8 @@
 const pegjs = require('pegjs');
 const fs = require('fs');
 
+const DEVELOP = false;
+
 const ruleset = fs.readFileSync("parser.pegjs", "utf-8");
 
 if( process.argv.length == 0 ) {
@@ -64,7 +66,7 @@ class Stack {
      * @param { number } value 値
      */
     set( address, size, value ) {
-        console.log( 48, address, size, value );
+        if( DEVELOP ) console.log( 48, address, size, value );
         this.access[size].set( [value], address/(size/8) );
         // console.log( this.access[size] );
     }
@@ -92,6 +94,7 @@ class Scope {
      */
     newvar( name, model, val=0 ) {
         this.vars[name] = {};
+        this.vars[name]["type"] = 'number';        
         switch( model ) {
             case 'int':
             case 'long':
@@ -103,8 +106,12 @@ class Scope {
             case 'char':
                 this.vars[name]["size"] = 8;
                 break;
+            case 'pointer':
+                this.vars[name]["size"] = 32;
+                this.vars[name]["type"] = 'pointer';
+                break;
             default:
-                throw new Error('変数のサイズがおかしいです');
+                throw new Error('変数のサイズがおかしいです' );
         }
         stack.push( val, this.vars[name]["size"] );
         this.vars[name]["sp"] = this.stack.sp;
@@ -119,6 +126,7 @@ class Scope {
     newarray( name, model, length ) {
         this.vars[name] = {};
         this.vars[name]["length"] = length;
+        this.vars[name]["type"] = 'array';
         switch( model ) {
             case 'int':
             case 'long':
@@ -144,27 +152,47 @@ class Scope {
      * @returns 
      */
     getvar( name ) {
-        console.log( 76, this.vars );
+        if( DEVELOP ) console.log( 76, this.vars );
         if( this.vars[name] ) {
             // console.log( 81, stack.u32 );
-
             let dummy = this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
             // console.log( "Scope.getvar", name, dummy );
-            return this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
+            //return this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
+            return dummy;
         } else {
             console.log( 78, "name error!" );
         }
     }
-
+    /**
+     * 変数のアドレスを取得する
+     * @param { String } name 変数名
+     * @returns 
+     */
+    getaddress( name ) {
+        if( DEVELOP ) console.log( 177, this.vars );
+        if( this.vars[name] ) {
+            // console.log( 81, stack.u32 );
+            let dummy = this.vars[name]["sp"];
+            // console.log( "Scope.getvar", name, dummy );
+            //return this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
+            return dummy;
+        } else {
+            console.log( 78, "name error!" );
+        }
+    }
     /**
      * 変数に値を代入する
      * @param { String } name 変数名
      * @param {*} value 値
      */
     setvar( name, value ) {
-        console.log( 165, name, value );
+        if( DEVELOP ) console.log( 165, name, value );
         if( this.vars[name] ) {
-            this.stack.set( this.vars[name]["sp"], this.vars[name]["size"], value );
+            if( this.vars[name]["type"] == 'number' ) {
+                this.stack.set( this.vars[name]["sp"], this.vars[name]["size"], value );
+            } else {
+                this.vars[name]["sp"] = value;
+            }
             //this.stack[ this.vars[name]["sp"] ] = value;
         } else {
             console.log( 169, "name error!" );
@@ -182,7 +210,7 @@ const source = fs.readFileSync( process.argv[2], "utf-8" );
 let parser = pegjs.generate( ruleset );
 let ast = parser.parse( source );
 
-// console.log( ast );
+console.log( ast );
 
 const TYPE = {
     VARIABLE: "Variable",
@@ -193,22 +221,29 @@ const TYPE = {
 const global = {};
 const func = {};
 func[ "printf" ] = ( arg ) => { console.log( 28, arg ); };
-func[ "print" ] = ( arg, scope ) => {
-    console.log( stack.get( stack.sp, 32) );
+func[ "print" ] = ( scope, argc ) => {
+    //console.log( "print", scope, stack.sp, argc );
+    console.log( "print", stack.get( stack.sp, 32) );
     // console.log( 105, scope );
     // console.log( 106, stack.sp );
     //console.log( stack.get( stack.sp, 32 ) );
     // console.log( 108, stack.u32 );
 }
-func[ "pp" ] = ( arg, scope ) => {
-    console.log( arg );
+func[ "pp" ] = ( scope, argc ) => {
+    console.log( "pp", argc );
 }
-
+func[ "debvars" ] = ( scope, argc ) => {
+    console.log( "debug", scope.vars );
+}
+// func[ "debvars" ] = ( arg, scope ) => {
+//     console.log( "aa", scope.vars );
+// }
+if( DEVELOP ) console.log( func );
 function interprit( ast, scope ) {
     let last = null;
     switch( ast["type"] ) {
         case "Program":
-            console.log( 34, ast.body );
+            //console.log( 34, ast.body );
             for( let line of ast.body ) {
                 interprit( line, scope );
             }
@@ -229,10 +264,10 @@ function interprit( ast, scope ) {
                 if( ast.parameter ) {
                     for( let i of ast.parameter ) {
                         // console.log( 120, i );
-                        // console.log( 137, scope.vars );
+                        // console.log( 238, scope );
                         // let dummy = scope.getvar( i.name );
                         let dummy = interprit( i, scope );
-                        // console.log( 140, dummy );
+                        if( DEVELOP ) console.log( "FuncExec", i, dummy );
                         stack.push( dummy, 32 );
                         // console.log( 139, stack.get( 52, 32 ) );
                         // console.log( 136, scope.getvar( i.name ) );
@@ -242,18 +277,24 @@ function interprit( ast, scope ) {
                 }
                 // console.log( 88, stack.sp );
                 // console.log( 166, ast["parameter"] );
+                //
+                //console.log( 251, scope );
                 let result = f( scope, ast["parameter"].length );
                 // console.log( 168, result );
                 stack.sp = backup;
                 // console.log( 169, stack.sp );
                 return result;
+            } else {
+                throw new Error( "関数" + ast["name"] + "は定義されていません" );
             }
             break;
         case "FunctionDefinition":
             // console.log( 52, ast["name"] );
             // console.log( 53, ast.block );
             func[ ast["name"] ] = ( parent, param_num ) => {
+                //console.log( 263, parent );
                 let sc = new Scope( parent, stack );
+                //console.log( 265, sc );
                 const backup = stack.sp;
                 // console.log( 143, ast );
                 if( ast["parameter"] ) {
@@ -272,7 +313,7 @@ function interprit( ast, scope ) {
             }
             break;
         case "block":
-            console.log( "block", ast );
+            //console.log( "block", ast );
             let block_result;
             for( let line of ast.stmt ) {
                 block_result = interprit( line, scope );
@@ -286,7 +327,7 @@ function interprit( ast, scope ) {
             // console.log( 149, ast["model"] );
             // console.log( 153, scope["vars"] );
             if( ast["value"]["type"] == "Pointer" ) {
-                scope.newvar( ast["value"]["name"], 32 );
+                scope.newvar( ast["value"]["name"], "pointer" );
             }
             else {
                 scope.newvar( ast["value"]["name"], ast["model"] );
@@ -305,7 +346,7 @@ function interprit( ast, scope ) {
             }
             break;
         case "AssignmentExpression":
-            console.log( 155, ast );
+            //console.log( 155, ast );
             let result = interprit( ast["right"], scope );
             // console.log( 197, result );
             scope.setvar( ast["left"]["name"], result );
@@ -353,13 +394,22 @@ function interprit( ast, scope ) {
                     break;
             }
         case "Identifier":
+            let resi;
+            if( scope.vars[ ast["name"] ]["type"] == 'array' ) {
+                resi = scope.getaddress( ast["name"] );
+            } else {
+                resi = scope.getvar( ast["name"] );
+            }
+            return resi;
+            break;
+        case "Pointer":
             //console.log( 249, scope );
             let res = scope.getvar( ast["name"] );
             // console.log( 255, res );
             return res;
             break;
         case "array":
-            console.log( ast );
+            if( DEVELOP ) console.log( ast );
 
             if( ast["model"] ) {    // ast["model"]がある場合は配列定義
                 let length;
@@ -374,13 +424,13 @@ function interprit( ast, scope ) {
                 } else if( ast["right"] ) {
                     length = ast["right"].length;
                 }
-                console.log( 362, length );
+                if( DEVELOP ) console.log( 362, length );
                 scope.newarray( name, ast["model"], length );
 
                 if( ast["right"] ) {
                     for( let i in ast["right"] ) {
-                        console.log( 379, scope.vars[name] );
-                        console.log( 380, ast["right"][i] );
+                        if( DEVELOP ) console.log( 379, scope.vars[name] );
+                        if( DEVELOP ) console.log( 380, ast["right"][i] );
                         stack.set( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["right"][i], scope ));
                     }
                 }
@@ -389,9 +439,9 @@ function interprit( ast, scope ) {
                 let size = scope.vars[name].size;
                 let sp = scope.vars[name].sp;
                 let seq = ast["row"]["value"];
-                console.log( 389, scope.vars[name], size );
+                if( DEVELOP ) console.log( 389, name, scope.vars[name], size );
                 let dummy = stack.get( sp + (seq * size)/8, size );
-                console.log( dummy );
+                return dummy;
             }
             break;
 
