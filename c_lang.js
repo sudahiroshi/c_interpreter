@@ -239,6 +239,12 @@ func[ "debvars" ] = ( scope, argc ) => {
 //     console.log( "aa", scope.vars );
 // }
 if( DEVELOP ) console.log( func );
+/**
+ * ASTを実行する
+ * @param {*} ast AST
+ * @param {Scope} scope 変数のスコープ
+ * @returns 実行結果
+ */
 function interprit( ast, scope ) {
     let last = null;
     switch( ast["type"] ) {
@@ -365,7 +371,6 @@ function interprit( ast, scope ) {
             // console.log( 166, ast );
             break;
         case "returnStatement":
-
             let dummy = interprit( ast["value"], scope );
             // console.log( "retStat", ast["value"], dummy );
             return dummy;
@@ -392,7 +397,25 @@ function interprit( ast, scope ) {
                 case "/":
                     return left / right;
                     break;
+                case "%":
+                    return left % right;
+                    break;
+                case ">":
+                    return left > right ? 1 : 0;
+                    break;
+                case "<":
+                    return left < right ? 1 : 0;
+                    break;
+                case ">=":
+                    return left >= right ? 1 : 0;
+                    break;
+                case "<=":
+                    return left <= right ? 1 : 0;
+                    break;
+                default:
+                    throw new Error( '演算子が不明です' );
             }
+            break;
         case "Identifier":
             let resi;
             if( scope.vars[ ast["name"] ]["type"] == 'array' ) {
@@ -409,7 +432,7 @@ function interprit( ast, scope ) {
             return res;
             break;
         case "array":
-            if( DEVELOP ) console.log( ast );
+            if( DEVELOP ) console.log( "array", ast );
 
             if( ast["model"] ) {    // ast["model"]がある場合は配列定義
                 let length;
@@ -444,7 +467,24 @@ function interprit( ast, scope ) {
                 return dummy;
             }
             break;
-
+        case "ForStatement":
+            console.log( 447, ast );
+            interprit( ast["AssignmentExpression"], scope );
+            while( interprit( ast["condition"], scope ) ) {
+                interprit( ast["blcok"], scope );
+                interprit( ast["ChangeExpression"], scope );
+            }
+            break;
+        case "whileStatement":
+            while( interprit( ast["condition"], scope ) != 0 ) {
+                interprit( ast["block"], scope );
+            }
+            break;
+        case "ifStatement":
+            if( interprit( ast["condition"], scope ) != 0 ) {
+                interprit( ast["block"], scope );
+            }
+            break;
     }
 }
 
