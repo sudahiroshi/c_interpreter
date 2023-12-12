@@ -355,7 +355,11 @@ function interprit( ast, scope ) {
             //console.log( 155, ast );
             let result = interprit( ast["right"], scope );
             // console.log( 197, result );
-            scope.setvar( ast["left"]["name"], result );
+            if( ast["left"]["type"] == "pointer" ) {
+
+            } else {
+                scope.setvar( ast["left"]["name"], result );
+            }
             // console.log( 156, result );
             // console.log( 157, scope.getvar( ast["left"]["name"] ) );
             // console.log( 158, scope["vars"] );

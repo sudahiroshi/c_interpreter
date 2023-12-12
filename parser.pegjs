@@ -17,22 +17,96 @@
     }, head);
   }
   
-  function sallowbinary( head, tail ) {
+  function buildAssignmentBinary( head, tail ) {
 	return {
         "type": "AssignmentExpression",
 		"operator": "=",
         left:head,
-         "right": bin(head, tail)
+         "right": assignmentBinary(head, tail)
     }
   }
-  function bin( head, tail ) {
+  
+  function assignmentBinary( head, tail ) {
 	return {
         "type": "BinaryExpression",
-		"operator": tail[0],
+		"operator": tail[1].substr(0,1),
         left:head,
-        right:tail[1]
+        right:tail[3]
     }
   }
+  
+  function buildPostIncrementBinary( head, tail ) {
+	return {
+        "type": "AssignmentExpression",
+		"operator": "=",
+        left:head,
+         "right": postIncrementBinary(head, tail)
+    }
+  }
+  
+  function postIncrementBinary( head, tail ) {//a++
+	return {
+        "type": "PostBinaryExpression",
+		"operator": "+",
+        left:head,
+        right:tail
+    }
+  }
+  
+  function buildPostDecrementBinary( head, tail ) {//a--
+	return {
+        "type": "AssignmentExpression",
+		"operator": "=",
+        left:head,
+         "right": postDecrementBinary(head, tail)
+    }
+  }
+  
+  function postDecrementBinary( head, tail ) {//a--
+	return {
+        "type": "PostBinaryExpression",
+		"operator": "-",
+        left:head,
+        right:tail
+    }
+  }
+  
+  function buildIncrementBinary( head, tail ) {//++a
+	return {
+        "type": "AssignmentExpression",
+		"operator": "=",
+        left:head,
+         "right": incrementBinary(head, tail)
+    }
+  }
+  
+  function incrementBinary( head, tail ) {//++a
+	return {
+        "type": "BinaryExpression",
+		"operator": "+",
+        left:head,
+        right:tail
+    }
+  }
+  
+  function buildDecrementBinary( head, tail ) {//--a;
+	return {
+        "type": "AssignmentExpression",
+		"operator": "=",
+        left:head,
+         "right": decrementBinary(head, tail)
+    }
+  }
+  
+  function decrementBinary( head, tail ) {//--a
+	return {
+        "type": "BinaryExpression",
+		"operator": "-",
+        left:head,
+        right:tail
+    }
+  }
+  
   function buildPipelineExpression(head, tail) {
     return tail.reduce(function(result, element) {
       return {
@@ -65,8 +139,6 @@
     return arr.filter(item => item !== ",");
   }
 }
-
-
 program
 	= body: comp{
 		return{
@@ -74,9 +146,7 @@ program
 			body
 		}
 	}
-
 comp = compstmt*
-
 compstmt
 	= includestmt
     /definestmt
@@ -106,11 +176,8 @@ definestmt =  _ "#define" _ word:$word _ "(" iden:iden ")" _ stmt:stmt _{
               }
        }
        
-
 functionstmt = multistmt
-
 multistmt = stmt
-
 stmt = returnstmt
     /expr
     /ifstmt
@@ -121,7 +188,6 @@ stmt = returnstmt
     /vardeclarestmt
     /calcstmt
    
-
 variable = 
           _ model:Model _  expr:expr _{ return {//int a=10
 							"type" : "variable",
@@ -174,7 +240,6 @@ structmodifier = _ model:$iden _ left:expr{
                             "value" : iden
                             }
                        }
-
                 / _ struct:"struct" _ iden:$iden _ block:block _ {
                         return { 
                                  "type":"structure",
@@ -189,7 +254,6 @@ structmodifier = _ model:$iden _ left:expr{
                                  block
                                }
                         }
-
 arraymodifier = _ model:Model _ left:to arraydeep:arraydeep _"="_  "{" right:ParameterList "}" ";"_{
     return{
       "type": "array",
@@ -216,7 +280,6 @@ arraymodifier = _ model:Model _ left:to arraydeep:arraydeep _"="_  "{" right:Par
       arraydeep,
     }
   }
-
   /_ model:Model _ iden:iden "[" int:from? "]" ";"_{
     return{
       "type": "array",
@@ -253,21 +316,17 @@ staticvariable = _ "static" _ model:Model _ iden:iden ";"_ { return{
                             "value" : iden
                             }
                         }
-
 Model = "void"
 	/"int"
 	/"float"
     /"double"
     /"char"
     /$("struct" _ iden)
-
 vardeclarestmt = structmodifier
     /arraymodifier
     /pointmodifier
     /staticvariable
     /variable
-
-
 function = _ model:Model _ name:$word "("_ parameterlist:ParameterList? _")" block:block _{
               return {
               			"type":"FunctionDefinition",
@@ -323,7 +382,6 @@ Parametervardeclarestmt =  _ model:Model"*" _ iden:iden _{ return {
       						"name":left
     					}
   				   }
-
   				/_ model:Model _ iden:iden "[" int:from? "]" {
     					return{
       						"type": "array",
@@ -338,7 +396,6 @@ Parametervardeclarestmt =  _ model:Model"*" _ iden:iden _{ return {
                             "value" : iden
                             }
                        }
-
 multideclare = head:Parameter tail:("," Parameter)* {
                 return [head].concat(tail.map(item => item[1]));
                 }
@@ -367,7 +424,6 @@ ifstmt
                 block
             }
           }
-
 whilestmt
 	 	= _ name:"while" "(" condition:condition ")" block:block _ {
         	return {
@@ -377,7 +433,6 @@ whilestmt
                 block
             }
           }
-
 dostmt = _ name:"do" block:block "while" "(" condition:condition ")" ";"_{
                       return{
                              "type":name + "Statement",
@@ -385,7 +440,6 @@ dostmt = _ name:"do" block:block "while" "(" condition:condition ")" ";"_{
                              condition
                              }
                       }
-
 forstmt = _ name:"for" "(" _ AssignmentExpression:stmt? _ condition:(condition)? ";" _ ChangeExpression:(ChangeExpression)* _ ")" block:block _{
         	return {
             	"type": "ForStatement",
@@ -396,7 +450,6 @@ forstmt = _ name:"for" "(" _ AssignmentExpression:stmt? _ condition:(condition)?
                 block
             }
           }
-
 expr
 	= _ left:to _"="_ right:function _{
 		return sallow( left, right );
@@ -414,7 +467,8 @@ expr
 		return sallow( left, right );
 	}
     /AssignmentExpression
-
+    /ChangeExpression2
+    /ChangeExpression
           
 block = _ "{" _ stmt:(multistmt)* _ "}" _{ 
 			return {
@@ -422,7 +476,13 @@ block = _ "{" _ stmt:(multistmt)* _ "}" _{
 						stmt
             }
            }
-
+            /_ stmt:(multistmt)* _{ 
+			return {
+            			"type": "block",
+						stmt
+            }
+           }
+           
 calcstmt
 	= _ expression:ChangeExpression2 _{
         return {
@@ -436,27 +496,24 @@ calcstmt
             expression                                                                                                
 		}
       }
-
 returnstmt = _ "return" _ value:from ";"{
                 return{
                         "type":"returnStatement",
                         "value":value
                       }
                 }
-
-
 condition = from
-
-
-
 Expression
   = head:Term tail:(_ [+-] _ Term)* {
       return buildBinaryExpression(head, tail)
     }
     
-
 Term
-  = head:allow tail:(_ [*/%] _ allow)* {
+  = head:logical tail:(_ [*/%] _ logical)* {
+      return buildBinaryExpression(head, tail)
+    }
+    logical
+  =head:allow tail:(_ [¥^~&|] _ allow)* {
       return buildBinaryExpression(head, tail)
     }
 
@@ -464,7 +521,6 @@ allow
   = head:Factor tail:(_ ReferenceOperator _ Factor)* {
       return buildReferenceExpression(head, tail)
     }
-
 Factor
   = "{" _ compstmt:ParameterList _ "}" { return compstmt; }
   /"(" _ expr:Expression _ ")" { return expr; }
@@ -510,12 +566,9 @@ ReservedWord = Model
               /"while"
               /"for"
               /"main"
-
 _ "whitespace"
   = [ \t\n\r]*
   
-
-
 from
   = ChangeExpression
   /syuutan
@@ -534,100 +587,67 @@ RelationExpression
   = _ head:Expression tail:(_ RelationalOperator _ Expression)* _　{
       　　return buildBinaryExpression( head, tail);
      }
-
 ChangeExpression
-  = _ iden:iden "++" _ {
-                    return {
-                           "type":"ChangeExpression",
-                           "Operator":"++",
-                           "left":iden,
-                           "right":1
-                           }
+  = _ left:iden right:IncrementOperator _ {
+                    return buildPostIncrementBinary(left, right);
                     }
-    /iden:iden "--"_ {
-                    return {
-                           "type":"ChangeExpression",
-                           "Operator":"--",
-                           "left":iden,
-                           "right":-1
-                           }
+    /left:iden right:DecrementOperator _ {
+                     return buildPostDecrementBinary(left, right);
                     }
-    / "++" iden:iden _ {
-                    return {
-                           "type":"ChangeExpression",
-                           "Operator":"++",
-                           "left":iden,
-                           "right":1
-                           }
+    / right:IncrementOperator left:iden _ {
+                    return  buildIncrementBinary(left, right);
                     }
-    /"--" iden:iden _ {
-                    return {
-                           "type":"ChangeExpression",
-                           "Operator":"--",
-                           "left":iden,
-                           "right":-1
-                           }
+    / right:IncrementOperator left:iden _ {
+                    return buildDecrementBinary(left, right);
                     }
                     
 ChangeExpression2
-  = _ iden:iden "++" ";"_ {
-                    return {
-                           "type":"ChangeExpression",
-                           "Operator":"++",
-                           "left":iden,
-                           "right":1
-                           }
+  = _ left:iden right:IncrementOperator ";"_ {
+                    return buildPostIncrementBinary(left, right);
                     }
-    /iden:iden "--"";"_ {
-                    return {
-                           "type":"ChangeExpression",
-                           "Operator":"--",
-                           "left":iden,
-                           "right":-1
-                           }
+    / left:iden right:DecrementOperator";"_ {
+                    return buildPostDecrementBinary(left, right);
                     }
-    / "++" iden:iden ";"_ {
-                    return {
-                           "type":"ChangeExpression",
-                           "Operator":"++",
-                           "left":iden,
-                           "right":1
-                           }
+    / right:IncrementOperator left:iden ";"_ {
+                    return  buildIncrementBinary(left, right);
                     }
-    /"--" iden:iden ";"_ {
-                    return {
-                           "type":"ChangeExpression",
-                           "Operator":"--",
-                           "left":iden,
-                           "right":-1
-                           }
+    / right:DecrementOperator left:iden ";"_ {
+                    return  buildDecrementBinary(left, right);
                     }
-
 syuutan = "'" "¥0" "'"
-
 arrayelement =  length:from{
     			return{
       				"type": "array",
       				"location": length
    				 }
   			}
-            
+            /length:_{
+    			return{
+      				"type": "array",
+      				"location": null
+   				 }
+  			}
+
 decarrayelement =  length:from{
     			return{
       				"type": "array",
       				"length": length
    				 }
   			}
-  
-anyarray = head:iden tail:("["arrayelement"]")+ {
+            /length:_{
+    			return{
+      				"type": "array",
+      				"length": null
+   				 }
+  			}
+
+anyarray = head:iden tail:("["arrayelement"]"_)+ {
                 return [head].concat(tail.map(item => item[1]));
            }
 
-arraydeep =  tail:("[" decarrayelement "]" )+ {
+arraydeep =  tail:("[" decarrayelement "]"_)+ {
                 return (tail.map(item => item[1]));
            }
-
-
 
 NumericLiteral
  = suffix:$(suffix) {
@@ -643,66 +663,34 @@ NumericLiteral
     return { "type": "Literal", value: parseInt(int), class: "Number" }
   }
   
-
 StringLiteral
   = '"' chars:DoubleQuoteCharacter* '"' {
     return { type: "Literal", value: chars.join(""), class: "String" };
   }
-
 DoubleQuoteCharacter
   = !'"' SourceCharacter { return text(); }
   
 SourceCharacter = .
-
-
 RelationalOperator
   = "<="
   / ">="
   / "<"
   / ">"
   / "="
-  / "^"
-  / "&"
-  / "|"
-  / "~"
-
 AssignmentExpression = 
-				_ left:iden right:( ExprOperator  from) _{
-                			return sallowbinary(left, right);
+				_ left:iden right:( _ ExprOperator _  from) ";"_{
+                			return buildAssignmentBinary(left, right);
                             }
-
 ExprOperator
-  =  "+=" {
-            return{
-            	"type":"BinaryExpression",
-                "operator":"+",
-            }
-         }
-  / "-=" {
-            return{
-            	"type":"BinaryExpression",
-                "operator":"-",
-            }
-         }
-  / "*=" {
-            return{
-            	"type":"BinaryExpression",
-                "operator":"*",
-            }
-         }
-  / "/=" {
-            return{
-            	"type":"BinaryExpression",
-                "operator":"/",
-            }
-         }
-  / "%=" {
-           return{
-                "type":"BinaryExpression",
-                "operator":"%",
-            }
-         }
-
+  ="+="
+  / "-="
+  /"*="
+  / "/=" 
+  / "%=" 
+  /"^="
+  /"&="
+  /"|="
+  /"~="
 ConvertOperator
   = "%d"
   / "%s"
@@ -717,25 +705,36 @@ ConvertOperator
 ReferenceOperator 
   = "->"
   / "."
-
+IncrementOperator 
+  = "++"{ 
+  			return {
+  					"type": "Literal", 
+                    "value": 1, 
+                    "class": "Number"
+            }
+        }
+DecrementOperator
+  ="--"{
+   			return {
+            		"type": "Literal", 
+                    "value": -1, 
+                    "class": "Number"
+            }
+        }
+        
+  				
 float = int frac digits
-
 suffix = int frac digits word
-
 hexint
   = signe? "0x" hexdigits
-
 int 
  =digit19 digits
  /digit
-
 digit19 = [1-9]
 digit= [0-9]
 digits=digit+
 hexdigits = [0-9a-f]+
-
 signe
   = "+"
   / "-"
-
 frac = "."
