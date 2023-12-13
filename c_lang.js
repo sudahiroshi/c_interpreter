@@ -53,8 +53,7 @@ class Memory {
      * @param { number } value 値
      */
     store( address, size, value ) {
-        //if( DEVELOP ) 
-        console.log( "store", address, size, value, this.access, this.access[size] );
+        if( DEVELOP ) console.log( "store", address, size, value, this.access, this.access["32"] );
         this.access[size].set( [value], address/(size/8) );
     }
 }
@@ -112,8 +111,8 @@ class Stack {
      */
     get( address, size ) {
         //let dummy = this.access[size].at( address/(size/8) );
-        let dummy = this.memory.load( address/(size/8), size );
-        // console.log( "Stack.get", address, size, this.access[size].at( address/(size/8) ) );
+        let dummy = this.memory.load( address, size );
+        //console.log( "Stack.get", address, size, address, dummy );
         return dummy;
     }
     /**
@@ -125,7 +124,7 @@ class Stack {
     set( address, size, value ) {
         if( DEVELOP ) console.log( 48, address, size, value );
         //this.access[size].set( [value], address/(size/8) );
-        this.memory.store( address, address/(size/8), value );
+        this.memory.store( address, size, value );
         // console.log( this.access[size] );
     }
 }
@@ -174,7 +173,7 @@ class Scope {
             default:
                 throw new Error('変数のサイズがおかしいです' );
         }
-        console.log( "newvar", val, this.vars[name]["size"] );
+        // console.log( "newvar", val, this.vars[name]["size"] );
         this.stack.push( val, this.vars[name]["size"] );
         this.vars[name]["sp"] = this.stack.sp;
         // console.log( 80, name, this.vars[name], stack.sp );
@@ -217,6 +216,7 @@ class Scope {
         if( DEVELOP ) console.log( 76, this.vars );
         if( this.vars[name] ) {
             // console.log( 81, stack.u32 );
+            // console.log( "getvar", this.vars[name] );
             let dummy = this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
             // console.log( "Scope.getvar", name, dummy );
             //return this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
@@ -285,7 +285,7 @@ const global = {};
 const func = {};
 func[ "printf" ] = ( arg ) => { console.log( 28, arg ); };
 func[ "print" ] = ( scope, argc ) => {
-    //console.log( "print", scope, stack.sp, argc );
+    // console.log( "print", scope, stack.sp, argc );
     console.log( "print", stack.get( stack.sp, 32) );
     // console.log( 105, scope );
     // console.log( 106, stack.sp );
@@ -335,8 +335,10 @@ function interprit( ast, scope ) {
                         // console.log( 120, i );
                         // console.log( 238, scope );
                         // let dummy = scope.getvar( i.name );
+                        // console.log( scope.getaddress(i.name) );
                         let dummy = interprit( i, scope );
-                        if( DEVELOP ) console.log( "FuncExec", i, dummy );
+                        //if( DEVELOP ) 
+                        // console.log( "FuncExec", i, dummy );
                         stack.push( dummy, 32 );
                         // console.log( 139, stack.get( 52, 32 ) );
                         // console.log( 136, scope.getvar( i.name ) );
@@ -358,14 +360,14 @@ function interprit( ast, scope ) {
             }
             break;
         case "FunctionDefinition":
-            // console.log( 52, ast["name"] );
-            // console.log( 53, ast.block );
+            //console.log( 52, ast["name"] );
+            //console.log( 53, ast.block );
             func[ ast["name"] ] = ( parent, param_num ) => {
                 //console.log( 263, parent );
                 let sc = new Scope( scope, parent, stack );
                 //console.log( 265, sc );
                 const backup = stack.sp;
-                // console.log( 143, ast );
+                //console.log( 143, ast );
                 if( ast["parameter"] ) {
                     let offset = 32 * (param_num-1);
                     for( let variable of ast["parameter"] ) {
@@ -485,9 +487,11 @@ function interprit( ast, scope ) {
             break;
         case "Identifier":
             let resi;
+            //console.log( "Identifier", scope.vars[ ast["name"] ] );
             if( scope.vars[ ast["name"] ]["type"] == 'array' ) {
                 resi = scope.getaddress( ast["name"] );
             } else {
+                //console.log( "Iden2", scope.getvar( ast["name"]));
                 resi = scope.getvar( ast["name"] );
             }
             return resi;
