@@ -2,6 +2,7 @@ const pegjs = require('pegjs');
 const fs = require('fs');
 
 const DEVELOP = false;
+const MEMORY_SIZE = 64;
 
 const ruleset = fs.readFileSync("parser.pegjs", "utf-8");
 
@@ -10,19 +11,71 @@ if( process.argv.length == 0 ) {
     process.exit(1);
 }
 
-class Stack {
+const models = {
+    'int': 32,
+    'long': 32,
+    'short': 16,
+    'char': 8
+}
+
+/**
+ * メモリ空間を司るクラス
+ */
+class Memory {
     /**
      * コンストラクタ
      * @param { number } size スタック全体のサイズ（バイト）
      */
     constructor( size ) {
-        this.stack = new ArrayBuffer( size );
+        this.memory = new ArrayBuffer( size );
         this.access = {};
-        this.access[8] = this.u8 = new Uint8Array( this.stack );
-        this.access[16] = this.u16 = new Uint16Array( this.stack );
-        this.access[32] = this.u32 = new Uint32Array( this.stack );
-        this.access[64] = this.u64 = new BigUint64Array( this.stack );
-        this.sp = size;
+        this.access[8] = this.u8 = new Uint8Array( this.memory );
+        this.access[16] = this.u16 = new Uint16Array( this.memory );
+        this.access[32] = this.u32 = new Uint32Array( this.memory );
+        this.access[64] = this.u64 = new BigUint64Array( this.memory );
+    }
+
+    /**
+     * メモリからデータを読み取る
+     * @param { number } address アドレス
+     * @param { number } size 読み取りサイズ（ビット）
+     * @returns 
+     */
+    load( address, size ) {
+        let value = this.access[size].at( address/(size/8) );
+        if( DEVELOP ) console.log( "load", address, size, value );
+        return value;
+    }
+    /**
+     * メモリにデータを書き込む
+     * @param { number } address アドレス
+     * @param { number } size 書き込みサイズ（ビット）
+     * @param { number } value 値
+     */
+    store( address, size, value ) {
+        if( DEVELOP ) console.log( "store", address, size, value, this.access, this.access["32"] );
+        this.access[size].set( [value], address/(size/8) );
+    }
+}
+
+/**
+ * スタック領域及びスタックポインタを司るクラス
+ */
+class Stack {
+    /**
+     * コンストラクタ
+     * @param { ArrayBuffer } memory メモリ空間
+     * @param { number } address スタックポインタの初期値
+     */
+    constructor( memory, address ) {
+        // this.stack = new ArrayBuffer( size );
+        // this.access = {};
+        // this.access[8] = this.u8 = new Uint8Array( this.stack );
+        // this.access[16] = this.u16 = new Uint16Array( this.stack );
+        // this.access[32] = this.u32 = new Uint32Array( this.stack );
+        // this.access[64] = this.u64 = new BigUint64Array( this.stack );
+        this.memory = memory;
+        this.sp = address;
     }
     /**
      * スタックにデータを積む（アライメントを考慮する）
@@ -34,7 +87,8 @@ class Stack {
         while( this.sp % (size/8) != 0 ) {
             this.sp--;
         }
-        this.access[size].set( [data], this.sp/(size/8) );
+        this.memory.store( this.sp, size, data );
+        //this.access[size].set( [data], this.sp/(size/8) );
         // console.log( 36, size, data );
         // console.log( this.access[size] );
     }
@@ -44,7 +98,8 @@ class Stack {
      * @returns データ
      */
     pop( size ) {
-        let data = this.access[size].at( this.sp/(size/8) );
+        let data = this.memory.load( this.sp, size );
+        //let data = this.access[size].at( this.sp/(size/8) );
         this.sp += size/8;
         return data;
     }
@@ -55,8 +110,9 @@ class Stack {
      * @returns 
      */
     get( address, size ) {
-        let dummy = this.access[size].at( address/(size/8) );
-        // console.log( "Stack.get", address, size, this.access[size].at( address/(size/8) ) );
+        //let dummy = this.access[size].at( address/(size/8) );
+        let dummy = this.memory.load( address, size );
+        //console.log( "Stack.get", address, size, address, dummy );
         return dummy;
     }
     /**
@@ -67,20 +123,24 @@ class Stack {
      */
     set( address, size, value ) {
         if( DEVELOP ) console.log( 48, address, size, value );
-        this.access[size].set( [value], address/(size/8) );
+        //this.access[size].set( [value], address/(size/8) );
+        this.memory.store( address, size, value );
         // console.log( this.access[size] );
     }
 }
 
-const models = {
-    'int': 32,
-    'long': 32,
-    'short': 16,
-    'char': 8
-}
-
+/**
+ * スコープごとに変数を管理するクラス
+ */
 class Scope {
-    constructor( parent, stack ) {
+    /**
+     * 
+     * @param { Scope } callee 呼び出し元のスコープ
+     * @param { Scope } parent 上位のスコープ
+     * @param { Stack } stack スタック領域
+     */
+    constructor( callee, parent, stack ) {
+        this.callee = callee;
         this.parent = parent;
         this.stack = stack;
         this.vars = {};
@@ -113,7 +173,8 @@ class Scope {
             default:
                 throw new Error('変数のサイズがおかしいです' );
         }
-        stack.push( val, this.vars[name]["size"] );
+        // console.log( "newvar", val, this.vars[name]["size"] );
+        this.stack.push( val, this.vars[name]["size"] );
         this.vars[name]["sp"] = this.stack.sp;
         // console.log( 80, name, this.vars[name], stack.sp );
     }
@@ -155,6 +216,7 @@ class Scope {
         if( DEVELOP ) console.log( 76, this.vars );
         if( this.vars[name] ) {
             // console.log( 81, stack.u32 );
+            // console.log( "getvar", this.vars[name] );
             let dummy = this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
             // console.log( "Scope.getvar", name, dummy );
             //return this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
@@ -200,8 +262,9 @@ class Scope {
     }
 }
 
-let stack = new Stack( 64 );
-let grobal = new Scope( null, stack );
+let memory = new Memory( MEMORY_SIZE );
+let stack = new Stack( memory, MEMORY_SIZE );
+let grobal = new Scope( null, null, stack );
 
 console.log("Ruleset = syntax.pegjs" );
 console.log("source code = " + process.argv[2] );
@@ -222,7 +285,7 @@ const global = {};
 const func = {};
 func[ "printf" ] = ( arg ) => { console.log( 28, arg ); };
 func[ "print" ] = ( scope, argc ) => {
-    //console.log( "print", scope, stack.sp, argc );
+    // console.log( "print", scope, stack.sp, argc );
     console.log( "print", stack.get( stack.sp, 32) );
     // console.log( 105, scope );
     // console.log( 106, stack.sp );
@@ -272,8 +335,10 @@ function interprit( ast, scope ) {
                         // console.log( 120, i );
                         // console.log( 238, scope );
                         // let dummy = scope.getvar( i.name );
+                        // console.log( scope.getaddress(i.name) );
                         let dummy = interprit( i, scope );
-                        if( DEVELOP ) console.log( "FuncExec", i, dummy );
+                        //if( DEVELOP ) 
+                        // console.log( "FuncExec", i, dummy );
                         stack.push( dummy, 32 );
                         // console.log( 139, stack.get( 52, 32 ) );
                         // console.log( 136, scope.getvar( i.name ) );
@@ -295,14 +360,14 @@ function interprit( ast, scope ) {
             }
             break;
         case "FunctionDefinition":
-            // console.log( 52, ast["name"] );
-            // console.log( 53, ast.block );
+            //console.log( 52, ast["name"] );
+            //console.log( 53, ast.block );
             func[ ast["name"] ] = ( parent, param_num ) => {
                 //console.log( 263, parent );
-                let sc = new Scope( parent, stack );
+                let sc = new Scope( scope, parent, stack );
                 //console.log( 265, sc );
                 const backup = stack.sp;
-                // console.log( 143, ast );
+                //console.log( 143, ast );
                 if( ast["parameter"] ) {
                     let offset = 32 * (param_num-1);
                     for( let variable of ast["parameter"] ) {
@@ -422,9 +487,11 @@ function interprit( ast, scope ) {
             break;
         case "Identifier":
             let resi;
+            //console.log( "Identifier", scope.vars[ ast["name"] ] );
             if( scope.vars[ ast["name"] ]["type"] == 'array' ) {
                 resi = scope.getaddress( ast["name"] );
             } else {
+                //console.log( "Iden2", scope.getvar( ast["name"]));
                 resi = scope.getvar( ast["name"] );
             }
             return resi;
@@ -458,7 +525,7 @@ function interprit( ast, scope ) {
                     for( let i in ast["right"] ) {
                         if( DEVELOP ) console.log( 379, scope.vars[name] );
                         if( DEVELOP ) console.log( 380, ast["right"][i] );
-                        stack.set( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["right"][i], scope ));
+                        memory.store( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["right"][i], scope ));
                     }
                 }
             } else {    // ast["model"]がない場合は配列を使う
@@ -467,7 +534,7 @@ function interprit( ast, scope ) {
                 let sp = scope.vars[name].sp;
                 let seq = ast["row"]["value"];
                 if( DEVELOP ) console.log( 389, name, scope.vars[name], size );
-                let dummy = stack.get( sp + (seq * size)/8, size );
+                let dummy = memory.load( sp + (seq * size)/8, size );
                 return dummy;
             }
             break;

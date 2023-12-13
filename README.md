@@ -39,4 +39,12 @@ $ npm install
 $ ./node_modules_bower/bin/bower install pegjs
 ```
 
+## クラス一覧
+
+クラス名 | 役割 |
+-|-
+Memory | メモリ空間を司る
+Stack | スタック領域及びスタックポインタを司る
+Scope | 変数のスコープを司る
+
 

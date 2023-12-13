@@ -7,12 +7,12 @@ int add( int x, int y ) {
 
 int main(int argc, char *argv[] ) {
     int a = 10;
-    pp( a );
+    print( a );
     int b = 20;
-    pp( b );
+    print( b );
     int c;
-    c = add( a, 1 );
-    pp( c );
+    c = add( a, b );
+    print( c );
     return 0;
 }
 
