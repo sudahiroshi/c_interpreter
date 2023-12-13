@@ -298,6 +298,49 @@ func[ "pp" ] = ( scope, argc ) => {
 func[ "debvars" ] = ( scope, argc ) => {
     console.log( "debug", scope.vars );
 }
+
+function BinaryExpression( ast, scope ) {
+    // console.log( 231, ast );
+    // console.log( 239, stack.u32 );
+    // console.log( 240, scope.vars );
+    let left = interprit( ast["left"], scope );
+    // console.log( 236, left );
+    let right = interprit( ast["right"], scope );
+    // console.log( 247, right );
+    switch( ast["operator"] ) {
+        case "+":
+            // console.log( 244, left, right, left + right );
+            return left + right;
+            break;
+        case "-":
+            return left - right;
+            break;
+        case "*":
+            return left * right;
+            break;
+        case "/":
+            return left / right;
+            break;
+        case "%":
+            return left % right;
+            break;
+        case ">":
+            return left > right ? 1 : 0;
+            break;
+        case "<":
+            return left < right ? 1 : 0;
+            break;
+        case ">=":
+            return left >= right ? 1 : 0;
+            break;
+        case "<=":
+            return left <= right ? 1 : 0;
+            break;
+        default:
+            throw new Error( '演算子が不明です' );
+    }
+}
+
 // func[ "debvars" ] = ( arg, scope ) => {
 //     console.log( "aa", scope.vars );
 // }
@@ -309,11 +352,12 @@ if( DEVELOP ) console.log( func );
  * @returns 実行結果
  */
 function interprit( ast, scope ) {
-    let last = null;
+    //console.log( "ast", ast );
     switch( ast["type"] ) {
         case "Program":
             //console.log( 34, ast.body );
             for( let line of ast.body ) {
+                //console.log(359);
                 interprit( line, scope );
             }
             break;
@@ -336,6 +380,7 @@ function interprit( ast, scope ) {
                         // console.log( 238, scope );
                         // let dummy = scope.getvar( i.name );
                         // console.log( scope.getaddress(i.name) );
+                        //console.log(382);
                         let dummy = interprit( i, scope );
                         //if( DEVELOP ) 
                         // console.log( "FuncExec", i, dummy );
@@ -387,6 +432,7 @@ function interprit( ast, scope ) {
             //console.log( "block", ast );
             let block_result;
             for( let line of ast.stmt ) {
+                //console.log(434);
                 block_result = interprit( line, scope );
                 // console.log( "block", block_result );
             }
@@ -408,6 +454,7 @@ function interprit( ast, scope ) {
             if( ast["expr"] )
             {
                 // console.log( 154, ast["expr"]);
+                //console.log(456);
                 let result = interprit( ast[ "expr" ], scope );
                 // console.log( 201, result );
                 // console.log( 201, stack.u32 );
@@ -418,6 +465,7 @@ function interprit( ast, scope ) {
             break;
         case "AssignmentExpression":
             //console.log( 155, ast );
+            //console.log(467);
             let result = interprit( ast["right"], scope );
             // console.log( 197, result );
             if( ast["left"]["type"] == "pointer" ) {
@@ -440,6 +488,7 @@ function interprit( ast, scope ) {
             // console.log( 166, ast );
             break;
         case "returnStatement":
+            //console.log(490);
             let dummy = interprit( ast["value"], scope );
             // console.log( "retStat", ast["value"], dummy );
             return dummy;
@@ -448,6 +497,7 @@ function interprit( ast, scope ) {
             // console.log( 231, ast );
             // console.log( 239, stack.u32 );
             // console.log( 240, scope.vars );
+            //console.log(499);
             let left = interprit( ast["left"], scope );
             // console.log( 236, left );
             let right = interprit( ast["right"], scope );
@@ -514,6 +564,7 @@ function interprit( ast, scope ) {
                     name = ast["left"]["name"];
                 }
                 if( ast["length"] ) {
+                    //console.log(566);
                     length = interprit( ast["length"], scope );
                 } else if( ast["right"] ) {
                     length = ast["right"].length;
@@ -525,6 +576,7 @@ function interprit( ast, scope ) {
                     for( let i in ast["right"] ) {
                         if( DEVELOP ) console.log( 379, scope.vars[name] );
                         if( DEVELOP ) console.log( 380, ast["right"][i] );
+                        //console.log(578);
                         memory.store( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["right"][i], scope ));
                     }
                 }
@@ -539,11 +591,12 @@ function interprit( ast, scope ) {
             }
             break;
         case "ForStatement":
-            console.log( 447, ast );
+            //console.log( 447, ast );
             interprit( ast["AssignmentExpression"], scope );
             while( interprit( ast["condition"], scope ) ) {
-                interprit( ast["blcok"], scope );
-                interprit( ast["ChangeExpression"], scope );
+                interprit( ast["block"], scope );
+                //console.log( 598, ast["ChangeExpression"] );
+                interprit( ast["ChangeExpression"][0], scope );
             }
             break;
         case "whileStatement":
@@ -555,6 +608,9 @@ function interprit( ast, scope ) {
             if( interprit( ast["condition"], scope ) != 0 ) {
                 interprit( ast["block"], scope );
             }
+            break;
+        case "PostBinaryExpression":
+            return BinaryExpression( ast, scope );
             break;
     }
 }
