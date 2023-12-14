@@ -222,7 +222,7 @@ class Scope {
             //return this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
             return dummy;
         } else {
-            console.log( 78, "name error!" );
+            console.log( 78, "name error!", name );
         }
     }
     /**
@@ -250,7 +250,10 @@ class Scope {
     setvar( name, value ) {
         if( DEVELOP ) console.log( 165, name, value );
         if( this.vars[name] ) {
-            if( this.vars[name]["type"] == 'number' ) {
+            if(
+                 this.vars[name]["type"] == 'number' ||
+                 this.vars[name]["type"] == 'pointer'
+             ) {
                 this.stack.set( this.vars[name]["sp"], this.vars[name]["size"], value );
             } else {
                 this.vars[name]["sp"] = value;
@@ -259,6 +262,14 @@ class Scope {
         } else {
             console.log( 169, "name error!" );
         }       
+    }
+    gettype( name ) {
+        if( DEVELOP ) console.log( 264, name );
+        if( this.vars[name] ) {
+            return this.vars[name]["type"];
+        } else {
+            console.log( 268, "name error!" );
+        }
     }
 }
 
@@ -369,7 +380,7 @@ function interprit( ast, scope ) {
         case "FunctionExecution":
             // console.log( 141, stack.u32 );
             if( func[ ast["name"] ] ){
-                // console.log( 46, ast["name"] );
+                //console.log( 46, ast );
                 // console.log( 47, ast.parameter );
                 let f = func[ ast["name"] ];
                 // console.log( 84, stack.sp );
@@ -464,15 +475,9 @@ function interprit( ast, scope ) {
             }
             break;
         case "AssignmentExpression":
-            //console.log( 155, ast );
             //console.log(467);
             let result = interprit( ast["right"], scope );
-            // console.log( 197, result );
-            if( ast["left"]["type"] == "pointer" ) {
-
-            } else {
-                scope.setvar( ast["left"]["name"], result );
-            }
+            scope.setvar( ast["left"]["name"], result );
             // console.log( 156, result );
             // console.log( 157, scope.getvar( ast["left"]["name"] ) );
             // console.log( 158, scope["vars"] );
@@ -536,8 +541,9 @@ function interprit( ast, scope ) {
             }
             break;
         case "Identifier":
+            //console.log( "Identifier", ast );
             let resi;
-            //console.log( "Identifier", scope.vars[ ast["name"] ] );
+            // console.log( "Identifier", scope.vars[ ast["name"] ] );
             if( scope.vars[ ast["name"] ]["type"] == 'array' ) {
                 resi = scope.getaddress( ast["name"] );
             } else {
@@ -547,47 +553,67 @@ function interprit( ast, scope ) {
             return resi;
             break;
         case "Pointer":
-            //console.log( 249, scope );
-            let res = scope.getvar( ast["name"] );
-            // console.log( 255, res );
-            return res;
-            break;
+            //console.log("Pointer", ast );
+            if( ast["expr"] ) {
+                let Pname = ast["expr"]["left"]["name"];
+                let Psize = scope.vars[Pname]["size"]
+                let address = scope.getvar( Pname );
+                let aa = interprit( ast["expr"], scope );
+                let Paddress = ( aa - address ) * (Psize/8) + address;
+                let res = memory.load( Paddress, Psize );
+                // console.log( "Po", Pname, aa, Psize, Paddress, aa - address );
+                return res;
+            } else {
+                //console.log( 249, scope );
+                // console.log( 551, ast, ast["name"] );
+                let address = scope.getvar( ast["name"] );
+                let Psize = scope.vars[ast["name"]]["size"]
+                // console.log( "address", address, Psize );
+                let res = memory.load( address, Psize );
+                // console.log( 255, res );
+                return res;
+                break;
+            }
         case "array":
             if( DEVELOP ) console.log( "array", ast );
-
-            if( ast["model"] ) {    // ast["model"]がある場合は配列定義
-                let length;
-                let name;
-                if( ast["value"] ) {
-                    name = ast["value"]["name"];
-                } else { 
-                    name = ast["left"]["name"];
-                }
-                if( ast["length"] ) {
-                    //console.log(566);
-                    length = interprit( ast["length"], scope );
-                } else if( ast["right"] ) {
-                    length = ast["right"].length;
-                }
-                if( DEVELOP ) console.log( 362, length );
-                scope.newarray( name, ast["model"], length );
-
-                if( ast["right"] ) {
-                    for( let i in ast["right"] ) {
-                        if( DEVELOP ) console.log( 379, scope.vars[name] );
-                        if( DEVELOP ) console.log( 380, ast["right"][i] );
-                        //console.log(578);
-                        memory.store( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["right"][i], scope ));
+            if( ast["expr"] ) {
+                return interprit( ast["expr"], scope );
+            } else {
+                if( ast["model"] ) {    // ast["model"]がある場合は配列定義
+                    let length;
+                    let name;
+                    if( ast["value"] ) {
+                        name = ast["value"]["name"];
+                    } else { 
+                        name = ast["name"]["name"];
                     }
+                    if( ast["length"] ) {
+                        //console.log(566);
+                        length = interprit( ast["length"], scope );
+                    } else if( ast["right"] ) {
+                        length = ast["right"].length;
+                    }
+                    if( DEVELOP ) console.log( 362, length );
+                    scope.newarray( name, ast["model"], length );
+
+                    if( ast["right"] ) {
+                        for( let i in ast["right"] ) {
+                            if( DEVELOP ) console.log( 379, scope.vars[name] );
+                            if( DEVELOP ) console.log( 380, ast["right"][i] );
+                            //console.log(578);
+                            memory.store( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["right"][i], scope ));
+                        }
+                    }
+                } else {    // ast["model"]がない場合は配列を使う
+                    // console.log( 590, ast );
+                    let name = ast["left"]["name"];
+                    let size = scope.vars[name].size;
+                    let sp = scope.vars[name].sp;
+                    let seq = ast["row"]["value"];
+                    if( DEVELOP ) console.log( 389, name, scope.vars[name], size );
+                    let dummy = memory.load( sp + (seq * size)/8, size );
+                    return dummy;
                 }
-            } else {    // ast["model"]がない場合は配列を使う
-                let name = ast["left"]["name"];
-                let size = scope.vars[name].size;
-                let sp = scope.vars[name].sp;
-                let seq = ast["row"]["value"];
-                if( DEVELOP ) console.log( 389, name, scope.vars[name], size );
-                let dummy = memory.load( sp + (seq * size)/8, size );
-                return dummy;
             }
             break;
         case "ForStatement":

@@ -399,9 +399,37 @@ Parametervardeclarestmt =  _ model:Model"*" _ iden:iden _{ return {
 multideclare = head:Parameter tail:("," Parameter)* {
                 return [head].concat(tail.map(item => item[1]));
                 }
-           
+
 ifstmt
-	 	= _ name:"if" "(" condition:condition ")" block:block _ {
+	 	= _ name:"if" "(" condition:condition ")" block:block elseif:elseifstmt+ endelse:elsestmt _ {
+        	return {
+            	"type": name + "Statement",
+                "funcname":name,
+                condition,
+                block,
+                elseif,
+                endelse
+            }
+          }
+          /_ name:"if" "(" condition:condition ")" block:block  elseif:elseifstmt+ _ {
+        	return {
+            	"type": name + "Statement",
+                "funcname":name,
+                condition,
+                block,
+                elseif
+            }
+          }
+          /_ name:"if" "(" condition:condition ")" block:block endelse:elsestmt _ {
+        	return {
+            	"type": name + "Statement",
+                "funcname":name,
+                condition,
+                block,
+                endelse
+            }
+          }
+          /_ name:"if" "(" condition:condition ")" block:block  _ {
         	return {
             	"type": name + "Statement",
                 "funcname":name,
@@ -409,7 +437,9 @@ ifstmt
                 block
             }
           }
-          /_ name:"else if" "(" condition:condition ")" block:block _ {
+          
+elseifstmt 
+        = _ name:"else if" "(" condition:condition ")" block:block _ {
         	return {
             	"type": name + "Statement",
                 "funcname":name,
@@ -417,7 +447,8 @@ ifstmt
                 block
             }
           }
-          /_ name:"else" block:block _ {
+elsestmt
+        = _ name:"else" block:block _ {
         	return {
             	"type": name + "Statement",
                 "funcname":name,
@@ -440,16 +471,25 @@ dostmt = _ name:"do" block:block "while" "(" condition:condition ")" ";"_{
                              condition
                              }
                       }
-forstmt = _ name:"for" "(" _ AssignmentExpression:stmt? _ condition:(condition)? ";" _ ChangeExpression:(ChangeExpression)* _ ")" block:block _{
+forstmt = _ name:"for" "(" _ assign:stmt? ";" _ condition:(condition)? ";" _ change:calcstmt _  ")" block:block _{
         	return {
             	"type": "ForStatement",
-                "funcname":name,
-                AssignmentExpression,
+                assign,
                 condition,
-                ChangeExpression,
+                change,
                 block
             }
           }
+          /_ name:"for" "(" _ assign:stmt? _ condition:(condition)? ";" _ change:calcstmt _  ")" block:block _{
+        	return {
+            	"type": "ForStatement",
+                assign,
+                condition,
+                change,
+                block
+            }
+          }
+          
 expr
 	= _ left:to _"="_ right:function _{
 		return sallow( left, right );
@@ -464,6 +504,9 @@ expr
 		return sallow( left, right );
 	}
     /_ left:Expression _"="_ right:Expression ";"_{
+		return sallow( left, right );
+	}
+    /_ left:Expression _"="_ right:Expression _{
 		return sallow( left, right );
 	}
     /AssignmentExpression
