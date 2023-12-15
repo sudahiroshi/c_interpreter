@@ -275,7 +275,7 @@ class Scope {
 
 let memory = new Memory( MEMORY_SIZE );
 let stack = new Stack( memory, MEMORY_SIZE );
-let grobal = new Scope( null, null, stack );
+let mem_grobal = new Scope( null, null, stack );
 
 console.log("Ruleset = syntax.pegjs" );
 console.log("source code = " + process.argv[2] );
@@ -450,7 +450,7 @@ function interprit( ast, scope ) {
             return block_result;
             break;
         case "variable":
-            // console.log( 148, ast );
+            console.log( 148, ast );
             // console.log( 148, ast["value"]["name"] );
             // console.log( 149, ast["model"] );
             // console.log( 153, scope["vars"] );
@@ -587,10 +587,12 @@ function interprit( ast, scope ) {
                     } else { 
                         name = ast["name"]["name"];
                     }
-                    if( ast["length"] ) {
-                        //console.log(566);
-                        length = interprit( ast["length"], scope );
+                    console.log( "arraydeep", ast["arraydeep"] );
+                    if( ast["arraydeep"]["length"] != null ) {
+                        console.log( "array要素数あり", name, ast["arraydeep"]["length"]);
+                        length = interprit( ast["arraydeep"]["length"], scope );
                     } else if( ast["right"] ) {
+                        console.log( "array要素数なし", name, ast["arraydeep"]["length"]);
                         length = ast["right"].length;
                     }
                     if( DEVELOP ) console.log( 362, length );
@@ -617,12 +619,12 @@ function interprit( ast, scope ) {
             }
             break;
         case "ForStatement":
-            //console.log( 447, ast );
-            interprit( ast["AssignmentExpression"], scope );
+            console.log( "For", ast );
+            interprit( ast["assign"], scope );
             while( interprit( ast["condition"], scope ) ) {
                 interprit( ast["block"], scope );
                 //console.log( 598, ast["ChangeExpression"] );
-                interprit( ast["ChangeExpression"][0], scope );
+                interprit( ast["change"], scope );
             }
             break;
         case "whileStatement":
@@ -636,14 +638,15 @@ function interprit( ast, scope ) {
             }
             break;
         case "PostBinaryExpression":
+            let temp = scope.getvar( ast["left"]["name"] );
             return BinaryExpression( ast, scope );
             break;
     }
 }
 
-interprit( ast, grobal );
+interprit( ast, mem_grobal );
 // console.log( 59, func["main"] );
 // console.log( 108, func );
 // stack.push( 0, 32 );
 // stack.push( 0, 32 );
-func[ "main" ]( grobal, 0 );
+func[ "main" ]( mem_grobal, 0 );
