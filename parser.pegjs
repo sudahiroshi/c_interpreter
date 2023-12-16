@@ -35,6 +35,22 @@
     }
   }
   
+  function InPostBinaryExpression(head, tail) {
+    return {
+        "type":"PostBinaryExpression",
+        "name":head,
+        "post":buildPostIncrementBinary(head, tail)
+    }
+  }
+  
+  function DecPostBinaryExpression(head, tail) {
+    return {
+        "type":"PostBinaryExpression",
+        "name":head,
+        "post":buildPostDecrementBinary(head, tail)
+    }
+  }
+  
   function buildPostIncrementBinary( head, tail ) {
 	return {
         "type": "AssignmentExpression",
@@ -46,7 +62,7 @@
   
   function postIncrementBinary( head, tail ) {//a++
 	return {
-        "type": "PostBinaryExpression",
+        "type": "BinaryExpression",
 		"operator": "+",
         left:head,
         right:tail
@@ -64,7 +80,7 @@
   
   function postDecrementBinary( head, tail ) {//a--
 	return {
-        "type": "PostBinaryExpression",
+        "type": "BinaryExpression",
 		"operator": "-",
         left:head,
         right:tail
@@ -254,38 +270,19 @@ structmodifier = _ model:$iden _ left:expr{
                                  block
                                }
                         }
-arraymodifier = _ model:Model _ left:to arraydeep:arraydeep _"="_  "{" right:ParameterList "}" ";"_{
+arraymodifier = _ model:Model _ value:expr ";"_{
     return{
       "type": "array",
       "model":model,
-      "value":left,
-      arraydeep,
-      right
+      value
     }
   }
-  /_ model:Model _ left:to "[" int:(from)? "]" _"="_ "{" right:ParameterList "}"";" _{
+  /_ model:Model _ iden:to arraydeep:arraydeep ";"_{
     return{
       "type": "array",
       "model":model,
-      "length": int,
-      left,
-      right
-    }
-  }
-  /_ model:Model _ left:to arraydeep:arraydeep ";"_{
-    return{
-      "type": "array",
-      "model":model,
-      "name":left,
-      arraydeep,
-    }
-  }
-  /_ model:Model _ iden:iden "[" int:from? "]" ";"_{
-    return{
-      "type": "array",
-      "model":model,
-      "value":iden,
-      "length": int
+      "name":iden,
+      arraydeep
     }
   }
   
@@ -322,11 +319,13 @@ Model = "void"
     /"double"
     /"char"
     /$("struct" _ iden)
+    
 vardeclarestmt = structmodifier
     /arraymodifier
     /pointmodifier
     /staticvariable
     /variable
+
 function = _ model:Model _ name:$word "("_ parameterlist:ParameterList? _")" block:block _{
               return {
               			"type":"FunctionDefinition",
@@ -401,60 +400,32 @@ multideclare = head:Parameter tail:("," Parameter)* {
                 }
 
 ifstmt
-	 	= _ name:"if" "(" condition:condition ")" block:block elseif:elseifstmt+ endelse:elsestmt _ {
+	 	= _ name:"if" "(" condition:condition ")" block:block endelse:elsestmt? _ {
         	return {
             	"type": name + "Statement",
                 "funcname":name,
                 condition,
                 block,
-                elseif,
-                endelse
+                "else":endelse
             }
           }
-          /_ name:"if" "(" condition:condition ")" block:block  elseif:elseifstmt+ _ {
-        	return {
-            	"type": name + "Statement",
-                "funcname":name,
-                condition,
-                block,
-                elseif
-            }
-          }
-          /_ name:"if" "(" condition:condition ")" block:block endelse:elsestmt _ {
-        	return {
-            	"type": name + "Statement",
-                "funcname":name,
-                condition,
-                block,
-                endelse
-            }
-          }
-          /_ name:"if" "(" condition:condition ")" block:block  _ {
-        	return {
-            	"type": name + "Statement",
-                "funcname":name,
-                condition,
-                block
-            }
-          }
-          
-elseifstmt 
-        = _ name:"else if" "(" condition:condition ")" block:block _ {
-        	return {
-            	"type": name + "Statement",
-                "funcname":name,
-                condition,
-                block
-            }
-          }
+         
 elsestmt
-        = _ name:"else" block:block _ {
+        = _ "else" _ name:"if" "(" condition:condition ")" block:block endelse:elsestmt? _ {
         	return {
             	"type": name + "Statement",
                 "funcname":name,
+                condition,
+                block,
+                "else":endelse
+            }
+          }
+        /_ name:"else" block:block _ {
+        	return {
                 block
             }
           }
+        
 whilestmt
 	 	= _ name:"while" "(" condition:condition ")" block:block _ {
         	return {
@@ -471,7 +442,7 @@ dostmt = _ name:"do" block:block "while" "(" condition:condition ")" ";"_{
                              condition
                              }
                       }
-forstmt = _ name:"for" "(" _ assign:stmt? ";" _ condition:(condition)? ";" _ change:calcstmt _  ")" block:block _{
+forstmt = _ name:"for" "(" _ assign:stmt? ";" _ condition:(condition)? ";" _ change:calcstmt? _  ")" block:block _{
         	return {
             	"type": "ForStatement",
                 assign,
@@ -480,7 +451,7 @@ forstmt = _ name:"for" "(" _ assign:stmt? ";" _ condition:(condition)? ";" _ cha
                 block
             }
           }
-          /_ name:"for" "(" _ assign:stmt? _ condition:(condition)? ";" _ change:calcstmt _  ")" block:block _{
+          /_ name:"for" "(" _ assign:stmt? _ condition:(condition)? ";" _ change:calcstmt? _  ")" block:block _{
         	return {
             	"type": "ForStatement",
                 assign,
@@ -500,7 +471,10 @@ expr
     /_ left:( "("from")") _"="_ right:(from)";" _{
 		return sallow( left, right );
 	}
-    /_ left:(anyarray) _"="_ right:from ";"_{
+    /_ left:toarraydeep _ "=" _ "{" right:ParameterList "}"_{
+        return sallow( left, right );
+    }
+    /_ left:(arraylocation) _"="_ right:from ";"_{
 		return sallow( left, right );
 	}
     /_ left:Expression _"="_ right:Expression ";"_{
@@ -512,7 +486,14 @@ expr
     /AssignmentExpression
     /ChangeExpression2
     /ChangeExpression
-          
+    
+toarraydeep = iden:iden arraydeep:arraydeep {
+            return {
+                   "name":iden,
+                   arraydeep
+            }
+          }
+
 block = _ "{" _ stmt:(multistmt)* _ "}" _{ 
 			return {
             			"type": "block",
@@ -567,7 +548,6 @@ allow
 Factor
   = "{" _ compstmt:ParameterList _ "}" { return compstmt; }
   /"(" _ expr:Expression _ ")" { return expr; }
-  /anyarray
   /NumericLiteral
   /StringLiteral
   /iden
@@ -597,6 +577,9 @@ iden
        /"&"word:$(word){
        return {"type":"address", name:word}
        }
+       /word:$(word) anyarray:anyarray {
+       return {"type":"array", arraydeep:anyarray }
+       }
        
 word
      = word:[a-zA-Z][0-9a-zA-Z_]*
@@ -613,7 +596,8 @@ _ "whitespace"
   = [ \t\n\r]*
   
 from
-  = ChangeExpression
+  = arraylocation
+  /ChangeExpression
   /syuutan
   /RelationExpression
   / value:NumericLiteral{
@@ -632,10 +616,10 @@ RelationExpression
      }
 ChangeExpression
   = _ left:iden right:IncrementOperator _ {
-                    return buildPostIncrementBinary(left, right);
+                    return InPostBinaryExpression(left, right);
                     }
     /left:iden right:DecrementOperator _ {
-                     return buildPostDecrementBinary(left, right);
+                     return DecPostBinaryExpression(left, right);
                     }
     / right:IncrementOperator left:iden _ {
                     return  buildIncrementBinary(left, right);
@@ -646,10 +630,10 @@ ChangeExpression
                     
 ChangeExpression2
   = _ left:iden right:IncrementOperator ";"_ {
-                    return buildPostIncrementBinary(left, right);
+                    return InPostBinaryExpression(left, right);
                     }
     / left:iden right:DecrementOperator";"_ {
-                    return buildPostDecrementBinary(left, right);
+                    return DecPostBinaryExpression(left, right);
                     }
     / right:IncrementOperator left:iden ";"_ {
                     return  buildIncrementBinary(left, right);
@@ -660,37 +644,37 @@ ChangeExpression2
 syuutan = "'" "¥0" "'"
 arrayelement =  length:from{
     			return{
-      				"type": "array",
       				"location": length
    				 }
   			}
             /length:_{
     			return{
-      				"type": "array",
       				"location": null
    				 }
   			}
 
 decarrayelement =  length:from{
     			return{
-      				"type": "array",
       				"length": length
    				 }
   			}
             /length:_{
     			return{
-      				"type": "array",
       				"length": null
    				 }
   			}
 
-anyarray = head:iden tail:("["arrayelement"]"_)+ {
-                return [head].concat(tail.map(item => item[1]));
+anyarray = tail:("["arrayelement"]"_)+ {
+                return (tail.map(item => item[1]));
            }
 
 arraydeep =  tail:("[" decarrayelement "]"_)+ {
                 return (tail.map(item => item[1]));
            }
+           
+arraylocation = _ word:$(word) anyarray:anyarray _ {
+               return { "type":"array", "name":word, arraydeep:anyarray}
+               }
 
 NumericLiteral
  = suffix:$(suffix) {

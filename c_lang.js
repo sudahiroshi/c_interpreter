@@ -284,7 +284,7 @@ const source = fs.readFileSync( process.argv[2], "utf-8" );
 let parser = pegjs.generate( ruleset );
 let ast = parser.parse( source );
 
-console.log( ast );
+// console.log( ast );
 
 const TYPE = {
     VARIABLE: "Variable",
@@ -372,6 +372,9 @@ function interprit( ast, scope ) {
                 interprit( line, scope );
             }
             break;
+        case "ExpressionStatement":
+            return interprit( ast["expression"], scope );
+            break;
         case "Include":
             // console.log( 40, ast );
             // console.log( ast["standardheader"] );
@@ -450,7 +453,7 @@ function interprit( ast, scope ) {
             return block_result;
             break;
         case "variable":
-            console.log( 148, ast );
+            //console.log( 148, ast );
             // console.log( 148, ast["value"]["name"] );
             // console.log( 149, ast["model"] );
             // console.log( 153, scope["vars"] );
@@ -619,11 +622,11 @@ function interprit( ast, scope ) {
             }
             break;
         case "ForStatement":
-            console.log( "For", ast );
+            //console.log( "For", ast );
             interprit( ast["assign"], scope );
             while( interprit( ast["condition"], scope ) ) {
                 interprit( ast["block"], scope );
-                //console.log( 598, ast["ChangeExpression"] );
+                //console.log( 598, ast["change"] );
                 interprit( ast["change"], scope );
             }
             break;
@@ -638,8 +641,14 @@ function interprit( ast, scope ) {
             }
             break;
         case "PostBinaryExpression":
-            let temp = scope.getvar( ast["left"]["name"] );
-            return BinaryExpression( ast, scope );
+            //console.log( "Post-ast", ast );
+            //console.log( "Post-ast-post", ast["post"] );
+            let temp = scope.getvar( ast["post"]["left"]["name"] );
+            //console.log( "temp", temp );
+            let resultP = interprit( ast["post"], scope );
+            //console.log( "resultP", resultP );
+            //console.log( "var", scope.getvar( ast["post"]["left"]["name"] ) );
+            return temp;
             break;
     }
 }
