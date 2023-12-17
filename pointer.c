@@ -3,6 +3,7 @@
 int main() {
     int a[] = { 1,2,3 };
     int b[3];
+    debvars();
     print( a[1] );
     int *d;
     d = a;

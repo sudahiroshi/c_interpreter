@@ -183,11 +183,13 @@ class Scope {
      * @param { String } name 配列名
      * @param { String } model 型名
      * @param { number } length 要素数
+     * @param { Array{number} } dimension 配列の次元ごとの要素数
      */
-    newarray( name, model, length ) {
+    newarray( name, model, length, dimension ) {
         this.vars[name] = {};
         this.vars[name]["length"] = length;
         this.vars[name]["type"] = 'array';
+        this.vars[name]["dimension"] = dimension;
         switch( model ) {
             case 'int':
             case 'long':
@@ -585,37 +587,47 @@ function interprit( ast, scope ) {
                 if( ast["model"] ) {    // ast["model"]がある場合は配列定義
                     let length;
                     let name;
-                    if( ast["value"] ) {
-                        name = ast["value"]["name"];
-                    } else { 
+                    let dimension = [];
+                    if( ast["value"] ) {    // 要素数の指定なし
+                        name = ast["value"]["left"]["name"]["name"];
+                        length = ast["value"]["right"].length;
+                        //console.log( "array要素数なし", length );
+                        dimension.push( length );
+                    } else {    // 要素数の指定あり
                         name = ast["name"]["name"];
-                    }
-                    console.log( "arraydeep", ast["arraydeep"] );
-                    if( ast["arraydeep"]["length"] != null ) {
-                        console.log( "array要素数あり", name, ast["arraydeep"]["length"]);
-                        length = interprit( ast["arraydeep"]["length"], scope );
-                    } else if( ast["right"] ) {
-                        console.log( "array要素数なし", name, ast["arraydeep"]["length"]);
-                        length = ast["right"].length;
+                        //console.log( 595-1, ast["arraydeep"].length );
+                        //console.log( 595, ast["arraydeep"]["length"] );
+                        length = 1;
+                        for( let deep of ast["arraydeep"] ) {
+                            let dim = interprit( deep["length"], scope );
+                            dimension.push( dim );
+                            //console.log( "deep", length, deep, dim, scope );
+                            length *= dim;
+                        }
+                        //length = interprit( ast["arraydeep"]["length"], scope );
+                        //console.log( "array要素数あり", length, ast["arraydeep"] );
                     }
                     if( DEVELOP ) console.log( 362, length );
-                    scope.newarray( name, ast["model"], length );
-
-                    if( ast["right"] ) {
-                        for( let i in ast["right"] ) {
+                    //console.log( "newarray", name, ast["model"], length );
+                    scope.newarray( name, ast["model"], length, dimension );
+                    if( ast["value"] && ast["value"]["right"] ) {
+                        for( let i in ast["value"]["right"] ) {
                             if( DEVELOP ) console.log( 379, scope.vars[name] );
-                            if( DEVELOP ) console.log( 380, ast["right"][i] );
+                            if( DEVELOP ) console.log( 380, ast["value"]["right"][i] );
                             //console.log(578);
-                            memory.store( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["right"][i], scope ));
+                            //console.log( "array_store", scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["value"]["right"][i], scope ));
+                            memory.store( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["value"]["right"][i], scope ));
                         }
                     }
                 } else {    // ast["model"]がない場合は配列を使う
                     // console.log( 590, ast );
-                    let name = ast["left"]["name"];
+                    let name = ast["name"];
+                    let deep = ast["arraydeep"].length;
+                    //console.log( "name", name, deep, scope.vars[name], ast );
                     let size = scope.vars[name].size;
                     let sp = scope.vars[name].sp;
-                    let seq = ast["row"]["value"];
-                    if( DEVELOP ) console.log( 389, name, scope.vars[name], size );
+                    let seq = interprit( ast["arraydeep"][0]["location"] );
+                    if( DEVELOP ) console.log( 389, name, scope.vars[name], size, sp, deep );
                     let dummy = memory.load( sp + (seq * size)/8, size );
                     return dummy;
                 }
@@ -638,6 +650,11 @@ function interprit( ast, scope ) {
         case "ifStatement":
             if( interprit( ast["condition"], scope ) != 0 ) {
                 interprit( ast["block"], scope );
+            } else {
+                //console.log( "else", ast["else"] );
+                if( ast["else"] ) {
+                    interprit( ast["else"]["block"], scope );
+                }
             }
             break;
         case "PostBinaryExpression":
