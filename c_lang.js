@@ -445,7 +445,7 @@ function interprit( ast, scope ) {
             }
             break;
         case "block":
-            //console.log( "block", ast );
+            console.log( "block", ast );
             let block_result;
             for( let line of ast.stmt ) {
                 //console.log(434);
@@ -480,9 +480,23 @@ function interprit( ast, scope ) {
             }
             break;
         case "AssignmentExpression":
-            //console.log(467);
+            //console.log(467, ast);
             let result = interprit( ast["right"], scope );
-            scope.setvar( ast["left"]["name"], result );
+            if( ast["left"]["type"] == "array" ) {
+                let sub = ast["left"];
+                    // console.log( 590, ast );
+                    let name = sub["name"];
+                    let deep = sub["arraydeep"].length;
+                    //console.log( "name", name, deep, scope.vars[name], ast );
+                    let size = scope.vars[name].size;
+                    let sp = scope.vars[name].sp;
+                    let seq = interprit( sub["arraydeep"][0]["location"] );
+                    if( DEVELOP ) console.log( 389, name, scope.vars[name], size, sp, deep );
+                    let dummy = memory.store( sp + (seq * size)/8, size, result );
+                    return dummy;
+            } else {
+                scope.setvar( ast["left"]["name"], result );
+            }
             // console.log( 156, result );
             // console.log( 157, scope.getvar( ast["left"]["name"] ) );
             // console.log( 158, scope["vars"] );
