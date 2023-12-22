@@ -38,13 +38,25 @@ class Memory {
 }
 
 class Area {
-    constructor( memory, start, size ) {
+    /**
+     * 管理するメモリ空間
+     * @param { Memory | Area } memory メモリ空間
+     * @param { String } name 空間の名前
+     * @param { number } start 開始アドレス
+     * @param { number } size メモリ容量
+     */
+    constructor( memory, name, start, size ) {
         this.memory = memory;
+        this.name = name;
         this.start = start;
         this.size = size;
-        this.using = 0;
+        /**
+         * 次に使用するアドレス
+         */
+        this.using = start;
     }
     malloc( size ) {
+        console.log( "area", this.start, this.size, this.using, size );
         if( this.start + this.size < this.using + size ) {
             throw new Error( "メモリが足りません" );
         } else {
@@ -55,9 +67,14 @@ class Area {
     }
 }
 
-const mem = new Memory( 16 );
+const mem = new Memory( 32 );
 mem.store( 0, 32, 0x10203040 );
 mem.store( 4, 32, 0x0f0f0f0f );
 mem.store( 8, 16, 0xffff );
 mem.store( 12, 32, 0x20202020 );
-console.log( mem );
+const textarea = new Area( mem, "text", 0, 16 );
+const t2 = new Area( textarea, "other", 16, 4 );
+let addr1 = textarea.malloc( 4 );
+let addr2 = textarea.malloc( 4 );
+let addr3 = t2.malloc( 4 );
+console.log( mem, addr1, addr2, addr3 );

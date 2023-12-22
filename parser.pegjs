@@ -55,16 +55,18 @@
 	return {
         "type": "AssignmentExpression",
 		"operator": "=",
-        left:head,
+        "left":typeReplace(head),
          "right": postIncrementBinary(head, tail)
     }
   }
+  
+  
   
   function postIncrementBinary( head, tail ) {//a++
 	return {
         "type": "BinaryExpression",
 		"operator": "+",
-        left:head,
+        left:typeReplace(head),
         right:tail
     }
   }
@@ -73,7 +75,7 @@
 	return {
         "type": "AssignmentExpression",
 		"operator": "=",
-        left:head,
+        left:typeReplace(head),
          "right": postDecrementBinary(head, tail)
     }
   }
@@ -82,7 +84,7 @@
 	return {
         "type": "BinaryExpression",
 		"operator": "-",
-        left:head,
+        left:typeReplace(head),
         right:tail
     }
   }
@@ -143,6 +145,14 @@
       };
     },head);
   }
+  
+  function typeReplace(head) {
+    return {
+        "type":"Identifier",
+        "name":head["name"]
+    }
+  }
+  
   function param(head, tail) {
     return tail.reduce(function(result, element) {
       return {
@@ -337,9 +347,10 @@ function = _ model:Model _ name:$word "("_ parameterlist:ParameterList? _")" blo
               }
           / _ !ReservedWord model:(Model)? _ name:$word "(" parameterlist:ParameterList? ")" ";"_{
               return {
-              			"type":"FunctionExecution",
+              			"position":location(),
+                        "type":"FunctionExecution",
                         "name":name,
-                        "parameter":parameterlist
+                        "parameter":parameterlist,
                      }
               }
           / _ model:Model _ name:$word "(" parameterlist:ParameterList? ")"";" _{
@@ -526,6 +537,11 @@ returnstmt = _ "return" _ value:from ";"{
                         "value":value
                       }
                 }
+
+ location　= _ !ReservedWord model:(Model)? _ name:$word "(" parameterlist:ParameterList? ")" ";"_{
+                location.start.line
+ }
+
 condition = from
 Expression
   = head:Term tail:(_ [+-] _ Term)* {
@@ -694,6 +710,7 @@ StringLiteral
   = '"' chars:DoubleQuoteCharacter* '"' {
     return { type: "Literal", value: chars.join(""), class: "String" };
   }
+  
 DoubleQuoteCharacter
   = !'"' SourceCharacter { return text(); }
   
@@ -750,18 +767,26 @@ DecrementOperator
         }
         
   				
-float = int frac digits
+float = signe? int frac digits
+
 suffix = int frac digits word
+
 hexint
   = signe? "0x" hexdigits
 int 
- =digit19 digits
- /digit
+ = signe? digit19 digits
+ / signe? digit
+ 
 digit19 = [1-9]
+
 digit= [0-9]
+
 digits=digit+
+
 hexdigits = [0-9a-f]+
+
 signe
   = "+"
   / "-"
+  
 frac = "."

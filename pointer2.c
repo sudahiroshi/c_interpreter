@@ -9,5 +9,6 @@ int main() {
         print( *d++ );
         print( d++ );
     }
+    debvars();
     return 0;
 }
