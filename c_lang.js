@@ -207,7 +207,7 @@ class Scope {
                 throw new Error('変数のサイズがおかしいです');
         }
         for( let i=0; i<length; i++ ) {
-            stack.push( 0, this.vars[name]["size"] );
+            this.stack.push( 0, this.vars[name]["size"] );
         }
         this.vars[name]["sp"] = this.stack.sp;
     }
@@ -274,6 +274,22 @@ class Scope {
         } else {
             console.log( 268, "name error!" );
         }
+    }
+    /**
+     * 配列名と要素番号の配列からオフセットを計算する
+     * @param { String } name 配列名
+     * @param { Array{number} } dimension 要素番号の配列
+     * @return { number } 配列のオフセット
+     */
+    array_offset( name, dimension ) {
+        let size = this.vars[name].size;
+        let dim = 0;
+        let orig = this.vars[name]["add"];
+        for( ; dim<dimension.length-1; dim++ ) {
+            seq += dimension[dim] * orig[dim];
+        }
+        seq += dimension[dim];
+        return seq;
     }
 }
 
