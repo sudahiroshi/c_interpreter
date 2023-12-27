@@ -155,7 +155,7 @@ class Scope {
             default:
                 throw new Error('変数のサイズがおかしいです' );
         }
-        console.log( "newvar", val, this.vars[name]["size"] );
+        // console.log( "newvar", val, this.vars[name]["size"] );
         this.stack.push( val, this.vars[name]["size"] );
         this.vars[name]["sp"] = this.stack.sp;
         // console.log( 80, name, this.vars[name], stack.sp );
@@ -165,11 +165,15 @@ class Scope {
      * @param { String } name 配列名
      * @param { String } model 型名
      * @param { number } length 要素数
+     * @param { Array{number} } dimension 配列の次元ごとの要素数
+     * @param { Array{number} } add 要素ごとのアドレス計算に使用する配列
      */
-    newarray( name, model, length ) {
+    newarray( name, model, length, dimension, add ) {
         this.vars[name] = {};
         this.vars[name]["length"] = length;
         this.vars[name]["type"] = 'array';
+        this.vars[name]["dimension"] = dimension;
+        this.vars[name]["add"] = add;
         switch( model ) {
             case 'int':
             case 'long':
@@ -185,31 +189,32 @@ class Scope {
                 throw new Error('変数のサイズがおかしいです');
         }
         for( let i=0; i<length; i++ ) {
-            stack.push( 0, this.vars[name]["size"] );
+            this.stack.push( 0, this.vars[name]["size"] );
         }
         this.vars[name]["sp"] = this.stack.sp;
     }
     /**
      * 変数の値を取得する
      * @param { String } name 変数名
-     * @returns 値
+     * @returns 
      */
     getvar( name ) {
         if( DEVELOP ) console.log( 76, this.vars );
         if( this.vars[name] ) {
             // console.log( 81, stack.u32 );
+            // console.log( "getvar", this.vars[name] );
             let dummy = this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
             // console.log( "Scope.getvar", name, dummy );
             //return this.stack.get( this.vars[name]["sp"], this.vars[name]["size"] );
             return dummy;
         } else {
-            console.log( 78, "name error!" );
+            console.log( 78, "name error!", name );
         }
     }
     /**
      * 変数のアドレスを取得する
      * @param { String } name 変数名
-     * @returns アドレス
+     * @returns { number } アドレス
      */
     getaddress( name ) {
         if( DEVELOP ) console.log( 177, this.vars );
@@ -231,7 +236,10 @@ class Scope {
     setvar( name, value ) {
         if( DEVELOP ) console.log( 165, name, value );
         if( this.vars[name] ) {
-            if( this.vars[name]["type"] == 'number' ) {
+            if(
+                 this.vars[name]["type"] == 'number' ||
+                 this.vars[name]["type"] == 'pointer'
+             ) {
                 this.stack.set( this.vars[name]["sp"], this.vars[name]["size"], value );
             } else {
                 this.vars[name]["sp"] = value;
@@ -241,16 +249,54 @@ class Scope {
             console.log( 169, "name error!" );
         }       
     }
+    gettype( name ) {
+        if( DEVELOP ) console.log( 264, name );
+        if( this.vars[name] ) {
+            return this.vars[name]["type"];
+        } else {
+            console.log( 268, "name error!" );
+        }
+    }
+    /**
+     * 配列名と要素番号の配列からオフセットを計算する
+     * @param { String } name 配列名
+     * @param { Array{number} } dimension 要素番号の配列
+     * @return { number } 配列のオフセット
+     */
+    array_offset( name, dimension ) {
+        let size = this.vars[name].size;
+        let dim = 0;
+        let seq = 0;
+        let orig = this.vars[name]["add"];
+        for( ; dim<dimension.length-1; dim++ ) {
+            seq += dimension[dim] * orig[dim];
+        }
+        console.log( "seq", seq );
+        seq += dimension[dim];
+        return seq;
+    }
+    /**
+     * 配列やポインタのアドレスを計算する
+     * @param { String } name 配列/ポインタ名
+     * @param { number } offset オフセット
+     * @returns { number } アドレス
+     */
+    calc_address( name, offset ) {
+        let base = this.getaddress( name );
+        let size = this.vars[name]["size"] / 8;
+        console.log( "base", base, size, offset );
+        return base + offset * size;
+    }
 }
 
-const mem = new Memory( 32 );
+const mem = new Memory( 64 );
 mem.store( 0, 32, 0x10203040 );
 mem.store( 4, 32, 0x0f0f0f0f );
 mem.store( 8, 16, 0xffff );
 mem.store( 12, 32, 0x20202020 );
 console.log( mem );
 
-const st = new Stack( mem, 32 );
+const st = new Stack( mem, 64 );
 //console.log( st );
 st.push( 0x10101010, 32 );
 //console.log( st );
@@ -272,3 +318,10 @@ console.log( scope );
 scope.setvar( "test", 8 );
 console.log( scope.vars );
 console.log( 82, scope.getvar( "test" ));
+scope.newarray( "foo", "int", 9, [3,3], [3] );
+console.log( scope.array_offset( "foo", [0,0] ) );
+console.log( scope.array_offset( "foo", [0,1] ) );
+console.log( scope.array_offset( "foo", [1,0] ) );
+console.log( scope.array_offset( "foo", [1,1] ) );
+console.log( scope.calc_address( "foo", scope.array_offset( "foo", [1,1] ) ) );
+console.log( scope.vars );

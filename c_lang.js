@@ -2,7 +2,7 @@ const pegjs = require('pegjs');
 const fs = require('fs');
 
 const DEVELOP = false;
-const MEMORY_SIZE = 64;
+const MEMORY_SIZE = 256;
 
 const ruleset = fs.readFileSync("parser.pegjs", "utf-8");
 
@@ -42,7 +42,7 @@ class Memory {
      * @returns 
      */
     load( address, size ) {
-        let value = this.access[size].at( address/(size/8) );
+        let value = this.access[size][ address/(size/8) ];
         if( DEVELOP ) console.log( "load", address, size, value );
         return value;
     }
@@ -183,11 +183,15 @@ class Scope {
      * @param { String } name 配列名
      * @param { String } model 型名
      * @param { number } length 要素数
+     * @param { Array{number} } dimension 配列の次元ごとの要素数
+     * @param { Array{number} } add 要素ごとのアドレス計算に使用する配列
      */
-    newarray( name, model, length ) {
+    newarray( name, model, length, dimension, add ) {
         this.vars[name] = {};
         this.vars[name]["length"] = length;
         this.vars[name]["type"] = 'array';
+        this.vars[name]["dimension"] = dimension;
+        this.vars[name]["add"] = add;
         switch( model ) {
             case 'int':
             case 'long':
@@ -203,7 +207,7 @@ class Scope {
                 throw new Error('変数のサイズがおかしいです');
         }
         for( let i=0; i<length; i++ ) {
-            stack.push( 0, this.vars[name]["size"] );
+            this.stack.push( 0, this.vars[name]["size"] );
         }
         this.vars[name]["sp"] = this.stack.sp;
     }
@@ -250,15 +254,30 @@ class Scope {
     setvar( name, value ) {
         if( DEVELOP ) console.log( 165, name, value );
         if( this.vars[name] ) {
-            if(
-                 this.vars[name]["type"] == 'number' ||
-                 this.vars[name]["type"] == 'pointer'
-             ) {
+            if( this.vars[name]["type"] == 'number' ) {
                 this.stack.set( this.vars[name]["sp"], this.vars[name]["size"], value );
+            } else if ( this.vars[name]["type"] == 'pointer' ) {
+                this.stack.set( this.vars[name]["sp"], this.vars[name]["size"], value );
+                //console.log( this.vars );
             } else {
                 this.vars[name]["sp"] = value;
             }
             //this.stack[ this.vars[name]["sp"] ] = value;
+        } else {
+            console.log( 169, "name error!" );
+        }       
+    }
+    /**
+     * ポインタ変数に値を代入する（*p = n）
+     * @param { String } name 変数名
+     * @param {*} value 値
+     */
+    setpvar( name, value ) {
+        if( DEVELOP ) console.log( 165, name, value );
+        if( this.vars[name] ) {
+            let sp = this.getaddress( name );
+            let address = this.stack.get( sp, 32 );
+            this.stack.set( address, 32, value );
         } else {
             console.log( 169, "name error!" );
         }       
@@ -271,11 +290,41 @@ class Scope {
             console.log( 268, "name error!" );
         }
     }
+    /**
+     * 配列名と要素番号の配列からオフセットを計算する
+     * @param { String } name 配列名
+     * @param { Array{number} } dimension 要素番号の配列
+     * @return { number } 配列のオフセット
+     */
+    array_offset( name, dimension ) {
+        let size = this.vars[name].size;
+        let dim = 0;
+        let seq = 0;
+        let orig = this.vars[name]["add"];
+        for( ; dim<dimension.length-1; dim++ ) {
+            seq += dimension[dim] * orig[dim];
+        }
+        seq += dimension[dim];
+        return seq;
+    }
+        /**
+     * 配列やポインタのアドレスを計算する
+     * @param { String } name 配列/ポインタ名
+     * @param { number } offset オフセット
+     * @returns { number } アドレス
+     */
+    calc_address( name, offset ) {
+        let address = this.getaddress( name );
+        let base = memory.load( address, 32 );
+        let size = this.vars[name]["size"] / 8;
+        //console.log( "base", base, size, offset );
+        return base + offset * size;
+    }
 }
 
 let memory = new Memory( MEMORY_SIZE );
 let stack = new Stack( memory, MEMORY_SIZE );
-let grobal = new Scope( null, null, stack );
+let mem_grobal = new Scope( null, null, stack );
 
 console.log("Ruleset = syntax.pegjs" );
 console.log("source code = " + process.argv[2] );
@@ -284,7 +333,7 @@ const source = fs.readFileSync( process.argv[2], "utf-8" );
 let parser = pegjs.generate( ruleset );
 let ast = parser.parse( source );
 
-console.log( ast );
+// console.log( ast );
 
 const TYPE = {
     VARIABLE: "Variable",
@@ -310,45 +359,106 @@ func[ "debvars" ] = ( scope, argc ) => {
     console.log( "debug", scope.vars );
 }
 
+/**
+ * 配列の要素数を調べる関数
+ * @param { Array } array 調べたい配列
+ * @param { Array } output 出力用の配列
+ * @returns 配列の要素数
+ */
+function get_elms( array, output=[] ) {
+    if( Array.isArray( array[0] ) ) {
+        let out = get_elms( array[0], output );
+        output.push( array.length );
+        return out * array.length;
+    } else {
+        output.push( array.length );
+        return array.length;
+    }
+}
+
+/**
+ * 配列のアドレスを計算するための次数ごとの値
+ * @param { Array } array get_elmsで算出されたoutput
+ * @returns 次数ごとの値
+ */
+function calc_elms( array ) {
+    let output = [];
+    for( let j=0; j<array.length-1; j+=1 ) {
+        let elms = 1;
+        for( let i=0; i<array.length-1-j; i++ ) {
+            elms *= array[ i ];
+        }
+        output.push( elms );
+    }
+    output.push( 1 );
+    return output;
+}
+
 function BinaryExpression( ast, scope ) {
-    // console.log( 231, ast );
-    // console.log( 239, stack.u32 );
-    // console.log( 240, scope.vars );
     let left = interprit( ast["left"], scope );
-    // console.log( 236, left );
     let right = interprit( ast["right"], scope );
-    // console.log( 247, right );
-    switch( ast["operator"] ) {
-        case "+":
-            // console.log( 244, left, right, left + right );
-            return left + right;
-            break;
-        case "-":
-            return left - right;
-            break;
-        case "*":
-            return left * right;
-            break;
-        case "/":
-            return left / right;
-            break;
-        case "%":
-            return left % right;
-            break;
-        case ">":
-            return left > right ? 1 : 0;
-            break;
-        case "<":
-            return left < right ? 1 : 0;
-            break;
-        case ">=":
-            return left >= right ? 1 : 0;
-            break;
-        case "<=":
-            return left <= right ? 1 : 0;
-            break;
-        default:
-            throw new Error( '演算子が不明です' );
+    let vartype = scope.gettype( ast["left"].name );
+    let type = ast["left"]["type"];
+    if( type == 'pointer' ) {
+        let name = ast["left"].name;
+        let sp = scope.vars[name].sp;
+        switch( ast["operator"] ) { // ポインタの指す値に対して演算する
+            case "+":
+            case "-":
+                let address = scope.calc_address( name, right );
+                //console.log( "address", address );
+                scope.setvar( name, address );
+                break;
+            default:
+                throw new Error("ポインタの演算子が不明です");
+        }
+    } if( vartype == 'pointer' ) { // ポインタの値（アドレス）に対して演算する
+        let name = ast["left"].name;
+        let sp = scope.vars[name].sp;
+        switch( ast["operator"] ) { // ポインタの指す値に対して演算する
+            case "+":
+            case "-":
+                let address = scope.calc_address( name, right );
+                //console.log( "address", address );
+                //scope.setvar( name, address );
+                return address;
+                break;
+            default:
+                throw new Error("ポインタの演算子が不明です");
+        }
+    } else {
+        switch( ast["operator"] ) {
+            case "+":
+                // console.log( 244, left, right, left + right );
+                return left + right;
+                break;
+            case "-":
+                return left - right;
+                break;
+            case "*":
+                return left * right;
+                break;
+            case "/":
+                return left / right;
+                break;
+            case "%":
+                return left % right;
+                break;
+            case ">":
+                return left > right ? 1 : 0;
+                break;
+            case "<":
+                return left < right ? 1 : 0;
+                break;
+            case ">=":
+                return left >= right ? 1 : 0;
+                break;
+            case "<=":
+                return left <= right ? 1 : 0;
+                break;
+            default:
+                throw new Error( '演算子が不明です' );
+        }
     }
 }
 
@@ -371,6 +481,9 @@ function interprit( ast, scope ) {
                 //console.log(359);
                 interprit( line, scope );
             }
+            break;
+        case "ExpressionStatement":
+            return interprit( ast["expression"], scope );
             break;
         case "Include":
             // console.log( 40, ast );
@@ -440,7 +553,7 @@ function interprit( ast, scope ) {
             }
             break;
         case "block":
-            //console.log( "block", ast );
+            // console.log( "block", ast );
             let block_result;
             for( let line of ast.stmt ) {
                 //console.log(434);
@@ -450,7 +563,7 @@ function interprit( ast, scope ) {
             return block_result;
             break;
         case "variable":
-            // console.log( 148, ast );
+            //console.log( 148, ast );
             // console.log( 148, ast["value"]["name"] );
             // console.log( 149, ast["model"] );
             // console.log( 153, scope["vars"] );
@@ -475,9 +588,35 @@ function interprit( ast, scope ) {
             }
             break;
         case "AssignmentExpression":
-            //console.log(467);
+            //console.log(467, ast);
             let result = interprit( ast["right"], scope );
-            scope.setvar( ast["left"]["name"], result );
+            if( ast["left"]["type"] == "array" ) {
+                let sub = ast["left"];
+                    // console.log( 590, ast );
+                    let name = sub["name"];
+                    let deep = sub["arraydeep"].length;
+                    //console.log( "name", name, deep, scope.vars[name], ast );
+                    let size = scope.vars[name].size;
+                    let sp = scope.vars[name].sp;
+                    let seq = 0;
+                    let dim = 0;
+                    console.log( "arraydeep", sub["arraydeep"], scope.vars[name]["dimension"] );
+                    for( ; dim<sub["arraydeep"].length-1; dim++ ) {
+                        console.log( "deep", sub["arraydeep"][dim] );
+                        let num = interprit( sub["arraydeep"][dim]["location"] );
+                        seq += num * scope.vars[name]["dimension"][dim];
+                    }
+                    seq += interprit( sub["arraydeep"][dim]["location"] );
+                    //let seq = interprit( sub["arraydeep"][0]["location"] );
+                    if( DEVELOP ) console.log( 389, name, scope.vars[name], size, sp, deep );
+                    let dummy = memory.store( sp + (seq * size)/8, size, result );
+                    return dummy;
+            } else if( ast["left"]["type"] == "Pointer" ) {
+                let name = ast["left"]["name"];
+                scope.setpvar( name, result );
+            } else {
+                scope.setvar( ast["left"]["name"], result );
+            }
             // console.log( 156, result );
             // console.log( 157, scope.getvar( ast["left"]["name"] ) );
             // console.log( 158, scope["vars"] );
@@ -499,46 +638,7 @@ function interprit( ast, scope ) {
             return dummy;
             break;
         case "BinaryExpression":
-            // console.log( 231, ast );
-            // console.log( 239, stack.u32 );
-            // console.log( 240, scope.vars );
-            //console.log(499);
-            let left = interprit( ast["left"], scope );
-            // console.log( 236, left );
-            let right = interprit( ast["right"], scope );
-            // console.log( 247, right );
-            switch( ast["operator"] ) {
-                case "+":
-                    // console.log( 244, left, right, left + right );
-                    return left + right;
-                    break;
-                case "-":
-                    return left - right;
-                    break;
-                case "*":
-                    return left * right;
-                    break;
-                case "/":
-                    return left / right;
-                    break;
-                case "%":
-                    return left % right;
-                    break;
-                case ">":
-                    return left > right ? 1 : 0;
-                    break;
-                case "<":
-                    return left < right ? 1 : 0;
-                    break;
-                case ">=":
-                    return left >= right ? 1 : 0;
-                    break;
-                case "<=":
-                    return left <= right ? 1 : 0;
-                    break;
-                default:
-                    throw new Error( '演算子が不明です' );
-            }
+            return BinaryExpression( ast, scope );
             break;
         case "Identifier":
             //console.log( "Identifier", ast );
@@ -582,47 +682,78 @@ function interprit( ast, scope ) {
                 if( ast["model"] ) {    // ast["model"]がある場合は配列定義
                     let length;
                     let name;
-                    if( ast["value"] ) {
-                        name = ast["value"]["name"];
-                    } else { 
+                    let dimension = [];
+                    let add;
+                    if( ast["value"] ) {    // 要素数の指定なし
+                        name = ast["value"]["left"]["name"]["name"];
+                        length = get_elms( ast["value"]["right"], dimension );
+                        add = calc_elms( dimension );
+                        console.log( "array要素数なし", length );
+                    } else {    // 要素数の指定あり
                         name = ast["name"]["name"];
-                    }
-                    if( ast["length"] ) {
-                        //console.log(566);
-                        length = interprit( ast["length"], scope );
-                    } else if( ast["right"] ) {
-                        length = ast["right"].length;
+                        //console.log( 595-1, ast["arraydeep"].length );
+                        //console.log( 595, ast["arraydeep"]["length"] );
+                        length = 1;
+                        for( let deep of ast["arraydeep"] ) {
+                            let dim = interprit( deep["length"], scope );
+                            dimension.push( dim );
+                            //console.log( "deep", length, deep, dim, scope );
+                            length *= dim;
+                        }
+                        dimension = dimension.reverse();
+                        add = calc_elms( dimension );
+                        //length = interprit( ast["arraydeep"]["length"], scope );
+                        //console.log( "array要素数あり", length, ast["arraydeep"] );
                     }
                     if( DEVELOP ) console.log( 362, length );
-                    scope.newarray( name, ast["model"], length );
-
-                    if( ast["right"] ) {
-                        for( let i in ast["right"] ) {
-                            if( DEVELOP ) console.log( 379, scope.vars[name] );
-                            if( DEVELOP ) console.log( 380, ast["right"][i] );
-                            //console.log(578);
-                            memory.store( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["right"][i], scope ));
+                    //console.log( "newarray", name, ast["model"], length );
+                    scope.newarray( name, ast["model"], length, dimension, add );
+                    if( ast["value"] && Array.isArray( ast["value"]["right"] ) ) {
+                        let rightArray = ast["value"]["right"].flat(Infinity);
+                        let values = rightArray.map( val => interprit(val) );
+                        let size = scope.vars[name].size;
+                        let sp = scope.vars[name].sp;
+                        for( let i in values ) {
+                            memory.store( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], values[i] );
                         }
+
+                        // for( let i in ast["value"]["right"] ) {
+                        //     if( DEVELOP ) console.log( 379, scope.vars[name] );
+                        //     if( DEVELOP ) console.log( 380, ast["value"]["right"][i] );
+                        //     //console.log(578);
+                        //     //console.log( "array_store", scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["value"]["right"][i], scope ));
+                        //     memory.store( scope.vars[name].sp + (i * models[ast["model"]])/8, models[ast["model"]], interprit( ast["value"]["right"][i], scope ));
+                        // }
                     }
                 } else {    // ast["model"]がない場合は配列を使う
                     // console.log( 590, ast );
-                    let name = ast["left"]["name"];
+                    let name = ast["name"];
+                    let deep = ast["arraydeep"].length;
+                    //console.log( "name", name, deep, scope.vars[name], ast );
                     let size = scope.vars[name].size;
                     let sp = scope.vars[name].sp;
-                    let seq = ast["row"]["value"];
-                    if( DEVELOP ) console.log( 389, name, scope.vars[name], size );
+                    let seq = 0;
+                    let dim = 0;
+                    console.log( "arraydeep", ast["arraydeep"], scope.vars[name]["dimension"] );
+                    for( ; dim<ast["arraydeep"].length-1; dim++ ) {
+                        //console.log( "deep", ast["arraydeep"][dim] );
+                        let num = interprit( ast["arraydeep"][dim]["location"] );
+                        seq += num * scope.vars[name]["add"][dim];
+                    }
+                    seq += interprit( ast["arraydeep"][dim]["location"] );
+                    if( DEVELOP ) console.log( 389, name, scope.vars[name], size, sp, deep );
                     let dummy = memory.load( sp + (seq * size)/8, size );
                     return dummy;
                 }
             }
             break;
         case "ForStatement":
-            //console.log( 447, ast );
-            interprit( ast["AssignmentExpression"], scope );
+            //console.log( "For", ast );
+            interprit( ast["assign"], scope );
             while( interprit( ast["condition"], scope ) ) {
                 interprit( ast["block"], scope );
-                //console.log( 598, ast["ChangeExpression"] );
-                interprit( ast["ChangeExpression"][0], scope );
+                //console.log( 598, ast["change"] );
+                interprit( ast["change"], scope );
             }
             break;
         case "whileStatement":
@@ -633,17 +764,37 @@ function interprit( ast, scope ) {
         case "ifStatement":
             if( interprit( ast["condition"], scope ) != 0 ) {
                 interprit( ast["block"], scope );
+            } else {
+                //console.log( "else", ast["else"] );
+                if( ast["else"] ) {
+                    interprit( ast["else"]["block"], scope );
+                }
             }
             break;
         case "PostBinaryExpression":
-            return BinaryExpression( ast, scope );
+            let temp;
+            if( ast["name"]["type"] == "Pointer" ) {
+                let name = ast["name"]["name"];
+                //console.log( "Post", scope.vars, name );
+                let size = scope.vars[name]["size"];
+                let sp = scope.vars[name].sp;
+                let address = memory.load( sp, size );
+                temp = memory.load( address, size );
+                interprit( ast["post"], scope );
+            } else {
+                temp = scope.getvar( ast["post"]["left"]["name"] );
+                let resultP = interprit( ast["post"], scope );
+            }
+            //console.log( "resultP", resultP );
+            //console.log( "var", scope.getvar( ast["post"]["left"]["name"] ) );
+            return temp;
             break;
     }
 }
 
-interprit( ast, grobal );
+interprit( ast, mem_grobal );
 // console.log( 59, func["main"] );
 // console.log( 108, func );
 // stack.push( 0, 32 );
 // stack.push( 0, 32 );
-func[ "main" ]( grobal, 0 );
+func[ "main" ]( mem_grobal, 0 );

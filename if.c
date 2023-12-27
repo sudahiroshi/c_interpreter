@@ -1,7 +1,9 @@
 #include <stdio.h>
 
 int main() {
-    int a = 5;
-    if( a>0 ) { print( a );}
+    int a = 15;
+    int b= 1;
+    if( a>10 ) print( a );
+    else print(b);
     return 0;
 }
