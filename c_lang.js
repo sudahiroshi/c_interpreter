@@ -254,15 +254,30 @@ class Scope {
     setvar( name, value ) {
         if( DEVELOP ) console.log( 165, name, value );
         if( this.vars[name] ) {
-            if(
-                 this.vars[name]["type"] == 'number' ||
-                 this.vars[name]["type"] == 'pointer'
-             ) {
+            if( this.vars[name]["type"] == 'number' ) {
                 this.stack.set( this.vars[name]["sp"], this.vars[name]["size"], value );
+            } else if ( this.vars[name]["type"] == 'pointer' ) {
+                this.stack.set( this.vars[name]["sp"], this.vars[name]["size"], value );
+                //console.log( this.vars );
             } else {
                 this.vars[name]["sp"] = value;
             }
             //this.stack[ this.vars[name]["sp"] ] = value;
+        } else {
+            console.log( 169, "name error!" );
+        }       
+    }
+    /**
+     * ポインタ変数に値を代入する（*p = n）
+     * @param { String } name 変数名
+     * @param {*} value 値
+     */
+    setpvar( name, value ) {
+        if( DEVELOP ) console.log( 165, name, value );
+        if( this.vars[name] ) {
+            let sp = this.getaddress( name );
+            let address = this.stack.get( sp, 32 );
+            this.stack.set( address, 32, value );
         } else {
             console.log( 169, "name error!" );
         }       
@@ -284,12 +299,26 @@ class Scope {
     array_offset( name, dimension ) {
         let size = this.vars[name].size;
         let dim = 0;
+        let seq = 0;
         let orig = this.vars[name]["add"];
         for( ; dim<dimension.length-1; dim++ ) {
             seq += dimension[dim] * orig[dim];
         }
         seq += dimension[dim];
         return seq;
+    }
+        /**
+     * 配列やポインタのアドレスを計算する
+     * @param { String } name 配列/ポインタ名
+     * @param { number } offset オフセット
+     * @returns { number } アドレス
+     */
+    calc_address( name, offset ) {
+        let address = this.getaddress( name );
+        let base = memory.load( address, 32 );
+        let size = this.vars[name]["size"] / 8;
+        //console.log( "base", base, size, offset );
+        return base + offset * size;
     }
 }
 
@@ -366,44 +395,70 @@ function calc_elms( array ) {
 }
 
 function BinaryExpression( ast, scope ) {
-    // console.log( 231, ast );
-    // console.log( 239, stack.u32 );
-    // console.log( 240, scope.vars );
     let left = interprit( ast["left"], scope );
-    // console.log( 236, left );
     let right = interprit( ast["right"], scope );
-    // console.log( 247, right );
-    switch( ast["operator"] ) {
-        case "+":
-            // console.log( 244, left, right, left + right );
-            return left + right;
-            break;
-        case "-":
-            return left - right;
-            break;
-        case "*":
-            return left * right;
-            break;
-        case "/":
-            return left / right;
-            break;
-        case "%":
-            return left % right;
-            break;
-        case ">":
-            return left > right ? 1 : 0;
-            break;
-        case "<":
-            return left < right ? 1 : 0;
-            break;
-        case ">=":
-            return left >= right ? 1 : 0;
-            break;
-        case "<=":
-            return left <= right ? 1 : 0;
-            break;
-        default:
-            throw new Error( '演算子が不明です' );
+    let vartype = scope.gettype( ast["left"].name );
+    let type = ast["left"]["type"];
+    if( type == 'pointer' ) {
+        let name = ast["left"].name;
+        let sp = scope.vars[name].sp;
+        switch( ast["operator"] ) { // ポインタの指す値に対して演算する
+            case "+":
+            case "-":
+                let address = scope.calc_address( name, right );
+                //console.log( "address", address );
+                scope.setvar( name, address );
+                break;
+            default:
+                throw new Error("ポインタの演算子が不明です");
+        }
+    } if( vartype == 'pointer' ) { // ポインタの値（アドレス）に対して演算する
+        let name = ast["left"].name;
+        let sp = scope.vars[name].sp;
+        switch( ast["operator"] ) { // ポインタの指す値に対して演算する
+            case "+":
+            case "-":
+                let address = scope.calc_address( name, right );
+                //console.log( "address", address );
+                //scope.setvar( name, address );
+                return address;
+                break;
+            default:
+                throw new Error("ポインタの演算子が不明です");
+        }
+    } else {
+        switch( ast["operator"] ) {
+            case "+":
+                // console.log( 244, left, right, left + right );
+                return left + right;
+                break;
+            case "-":
+                return left - right;
+                break;
+            case "*":
+                return left * right;
+                break;
+            case "/":
+                return left / right;
+                break;
+            case "%":
+                return left % right;
+                break;
+            case ">":
+                return left > right ? 1 : 0;
+                break;
+            case "<":
+                return left < right ? 1 : 0;
+                break;
+            case ">=":
+                return left >= right ? 1 : 0;
+                break;
+            case "<=":
+                return left <= right ? 1 : 0;
+                break;
+            default:
+                throw new Error( '演算子が不明です' );
+        }
     }
 }
 
@@ -558,7 +613,7 @@ function interprit( ast, scope ) {
                     return dummy;
             } else if( ast["left"]["type"] == "Pointer" ) {
                 let name = ast["left"]["name"];
-                scope.setvar( name, result );
+                scope.setpvar( name, result );
             } else {
                 scope.setvar( ast["left"]["name"], result );
             }
@@ -583,46 +638,7 @@ function interprit( ast, scope ) {
             return dummy;
             break;
         case "BinaryExpression":
-            // console.log( 231, ast );
-            // console.log( 239, stack.u32 );
-            // console.log( 240, scope.vars );
-            //console.log(499);
-            let left = interprit( ast["left"], scope );
-            // console.log( 236, left );
-            let right = interprit( ast["right"], scope );
-            // console.log( 247, right );
-            switch( ast["operator"] ) {
-                case "+":
-                    // console.log( 244, left, right, left + right );
-                    return left + right;
-                    break;
-                case "-":
-                    return left - right;
-                    break;
-                case "*":
-                    return left * right;
-                    break;
-                case "/":
-                    return left / right;
-                    break;
-                case "%":
-                    return left % right;
-                    break;
-                case ">":
-                    return left > right ? 1 : 0;
-                    break;
-                case "<":
-                    return left < right ? 1 : 0;
-                    break;
-                case ">=":
-                    return left >= right ? 1 : 0;
-                    break;
-                case "<=":
-                    return left <= right ? 1 : 0;
-                    break;
-                default:
-                    throw new Error( '演算子が不明です' );
-            }
+            return BinaryExpression( ast, scope );
             break;
         case "Identifier":
             //console.log( "Identifier", ast );
@@ -757,11 +773,13 @@ function interprit( ast, scope ) {
             break;
         case "PostBinaryExpression":
             let temp;
-            if( ast["name"]["type"] == "pointer" ) {
-                let name = ast["name"];
-                let size = scope.vars[name].size;
+            if( ast["name"]["type"] == "Pointer" ) {
+                let name = ast["name"]["name"];
+                //console.log( "Post", scope.vars, name );
+                let size = scope.vars[name]["size"];
                 let sp = scope.vars[name].sp;
-                temp = memory.load( sp, size );
+                let address = memory.load( sp, size );
+                temp = memory.load( address, size );
                 interprit( ast["post"], scope );
             } else {
                 temp = scope.getvar( ast["post"]["left"]["name"] );

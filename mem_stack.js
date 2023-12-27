@@ -214,7 +214,7 @@ class Scope {
     /**
      * 変数のアドレスを取得する
      * @param { String } name 変数名
-     * @returns 
+     * @returns { number } アドレス
      */
     getaddress( name ) {
         if( DEVELOP ) console.log( 177, this.vars );
@@ -275,16 +275,28 @@ class Scope {
         seq += dimension[dim];
         return seq;
     }
+    /**
+     * 配列やポインタのアドレスを計算する
+     * @param { String } name 配列/ポインタ名
+     * @param { number } offset オフセット
+     * @returns { number } アドレス
+     */
+    calc_address( name, offset ) {
+        let base = this.getaddress( name );
+        let size = this.vars[name]["size"] / 8;
+        console.log( "base", base, size, offset );
+        return base + offset * size;
+    }
 }
 
-const mem = new Memory( 32 );
+const mem = new Memory( 64 );
 mem.store( 0, 32, 0x10203040 );
 mem.store( 4, 32, 0x0f0f0f0f );
 mem.store( 8, 16, 0xffff );
 mem.store( 12, 32, 0x20202020 );
 console.log( mem );
 
-const st = new Stack( mem, 32 );
+const st = new Stack( mem, 64 );
 //console.log( st );
 st.push( 0x10101010, 32 );
 //console.log( st );
@@ -306,8 +318,10 @@ console.log( scope );
 scope.setvar( "test", 8 );
 console.log( scope.vars );
 console.log( 82, scope.getvar( "test" ));
-scope.newarray( "foo", "int", 4, [3,3], [3] );
+scope.newarray( "foo", "int", 9, [3,3], [3] );
 console.log( scope.array_offset( "foo", [0,0] ) );
 console.log( scope.array_offset( "foo", [0,1] ) );
 console.log( scope.array_offset( "foo", [1,0] ) );
 console.log( scope.array_offset( "foo", [1,1] ) );
+console.log( scope.calc_address( "foo", scope.array_offset( "foo", [1,1] ) ) );
+console.log( scope.vars );
