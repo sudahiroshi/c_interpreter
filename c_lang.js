@@ -331,6 +331,7 @@ console.log("source code = " + process.argv[2] );
 
 const source = fs.readFileSync( process.argv[2], "utf-8" );
 let parser = pegjs.generate( ruleset );
+
 let ast = parser.parse( source );
 
 // console.log( ast );
@@ -412,7 +413,7 @@ function BinaryExpression( ast, scope ) {
             default:
                 throw new Error("ポインタの演算子が不明です");
         }
-    } if( vartype == 'pointer' ) { // ポインタの値（アドレス）に対して演算する
+    } else if( vartype == 'pointer' ) { // ポインタの値（アドレス）に対して演算する
         let name = ast["left"].name;
         let sp = scope.vars[name].sp;
         switch( ast["operator"] ) { // ポインタの指す値に対して演算する
@@ -659,7 +660,7 @@ function interprit( ast, scope ) {
                 let Psize = scope.vars[Pname]["size"]
                 let address = scope.getvar( Pname );
                 let aa = interprit( ast["expr"], scope );
-                let Paddress = ( aa - address ) * (Psize/8) + address;
+                let Paddress = ( aa - address ) + address;
                 let res = memory.load( Paddress, Psize );
                 // console.log( "Po", Pname, aa, Psize, Paddress, aa - address );
                 return res;
