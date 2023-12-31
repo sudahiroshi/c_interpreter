@@ -13,7 +13,7 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/c_lang.js",
-            "args": ["pointer3.c"]
+            "args": ["func.c"]
         }
     ]
 }
