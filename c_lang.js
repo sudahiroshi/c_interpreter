@@ -331,6 +331,7 @@ console.log("source code = " + process.argv[2] );
 
 const source = fs.readFileSync( process.argv[2], "utf-8" );
 let parser = pegjs.generate( ruleset );
+
 let ast = parser.parse( source );
 
 // console.log( ast );
@@ -346,7 +347,7 @@ const func = {};
 func[ "printf" ] = ( arg ) => { console.log( 28, arg ); };
 func[ "print" ] = ( scope, argc ) => {
     // console.log( "print", scope, stack.sp, argc );
-    console.log( "print", stack.get( stack.sp, 32) );
+    console.log( "print", stack.get( stack.sp + 4, 32) );
     // console.log( 105, scope );
     // console.log( 106, stack.sp );
     //console.log( stack.get( stack.sp, 32 ) );
@@ -412,7 +413,7 @@ function BinaryExpression( ast, scope ) {
             default:
                 throw new Error("ポインタの演算子が不明です");
         }
-    } if( vartype == 'pointer' ) { // ポインタの値（アドレス）に対して演算する
+    } else if( vartype == 'pointer' ) { // ポインタの値（アドレス）に対して演算する
         let name = ast["left"].name;
         let sp = scope.vars[name].sp;
         switch( ast["operator"] ) { // ポインタの指す値に対して演算する
@@ -515,6 +516,7 @@ function interprit( ast, scope ) {
                 } else {
                     ast.parameter = [];
                 }
+                stack.push( ast["position"]["start"]["line"] * 256 + ast["position"]["start"]["column"], 32 );
                 // console.log( 88, stack.sp );
                 // console.log( 166, ast["parameter"] );
                 //
@@ -538,7 +540,7 @@ function interprit( ast, scope ) {
                 const backup = stack.sp;
                 //console.log( 143, ast );
                 if( ast["parameter"] ) {
-                    let offset = 32 * (param_num-1);
+                    let offset = 32 * (param_num);
                     for( let variable of ast["parameter"] ) {
                         // console.log( "FuncDef", variable.value.name, variable.model, backup + (offset/8), stack.get( backup + (offset/8), 32) );
                         sc.newvar( variable.value.name, variable.model, stack.get( backup + (offset/8), 32) );
@@ -659,7 +661,7 @@ function interprit( ast, scope ) {
                 let Psize = scope.vars[Pname]["size"]
                 let address = scope.getvar( Pname );
                 let aa = interprit( ast["expr"], scope );
-                let Paddress = ( aa - address ) * (Psize/8) + address;
+                let Paddress = ( aa - address ) + address;
                 let res = memory.load( Paddress, Psize );
                 // console.log( "Po", Pname, aa, Psize, Paddress, aa - address );
                 return res;
