@@ -12,6 +12,7 @@ class Memory {
         this.access[16] = this.u16 = new Uint16Array( this.memory );
         this.access[32] = this.u32 = new Uint32Array( this.memory );
         this.access[64] = this.u64 = new BigUint64Array( this.memory );
+        this.event = [];
     }
 
     /**
@@ -34,6 +35,20 @@ class Memory {
     store( address, size, value ) {
         if( DEVELOP ) console.log( "store", address, size, value );
         this.access[size].set( [value], address/(size/8) );
+        for( let ev of this.event ) {
+            if( (ev.start <= address) && (address<ev.end) ) {
+                ev.callback( address, size, value );
+            }
+        }
+    }
+    /**
+     * メモリ書き込みを監視する
+     * @param { number } start 開始アドレス
+     * @param { number } end 終了アドレス
+     * @param { function } callback コールバック関数
+     */
+    on( start, end, callback ) {
+        this.event.push( { start: start, end: end, callback: callback} );
     }
 }
 
@@ -68,6 +83,12 @@ class Area {
 }
 
 const mem = new Memory( 32 );
+mem.on( 4, 8, ( ad, sz, val ) => {
+    console.log( "memory changed:", ad, sz, val );
+});
+mem.on( 0, 16, ( ad, sz, val ) => {
+    console.log( "memory changed2:", ad, sz, val );
+});
 mem.store( 0, 32, 0x10203040 );
 mem.store( 4, 32, 0x0f0f0f0f );
 mem.store( 8, 16, 0xffff );
@@ -77,4 +98,4 @@ const t2 = new Area( textarea, "other", 16, 4 );
 let addr1 = textarea.malloc( 4 );
 let addr2 = textarea.malloc( 4 );
 let addr3 = t2.malloc( 4 );
-console.log( mem, addr1, addr2, addr3 );
+//console.log( mem, addr1, addr2, addr3 );
