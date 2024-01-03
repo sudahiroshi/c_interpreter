@@ -55,6 +55,20 @@ class Memory {
     store( address, size, value ) {
         if( DEVELOP ) console.log( "store", address, size, value, this.access, this.access["32"] );
         this.access[size].set( [value], address/(size/8) );
+        for( let ev of this.event ) {
+            if( (ev.start <= address) && (address<ev.end) ) {
+                ev.callback( address, size, value );
+            }
+        }
+    }
+    /**
+     * メモリ書き込みを監視する
+     * @param { number } start 開始アドレス
+     * @param { number } end 終了アドレス
+     * @param { function } callback コールバック関数
+     */
+    on( start, end, callback ) {
+        this.event.push( { start: start, end: end, callback: callback} );
     }
 }
 
