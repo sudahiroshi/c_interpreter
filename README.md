@@ -36,7 +36,7 @@ $ bun run c_lang.js hello.c
 
 ```
 $ npm install
-$ ./node_modules_bower/bin/bower install pegjs
+$ ./node_modules/bower/bin/bower install pegjs
 ```
 
 ## クラス一覧
