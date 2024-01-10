@@ -2,6 +2,49 @@
 const DEVELOP = false;
 const MEMORY_SIZE = 64;
 
+function padding8( number ) {
+    if( number )
+        return ('0' + number.toString(16)).slice(-2).toUpperCase();
+    else if( number == 0 )  return '00';
+    else return '----';
+}
+
+function padding16( number ) {
+    if( number )
+        return ('000' + number.toString(16)).slice(-4).toUpperCase();
+    else if( number == 0 )  return '0000';
+    else return '----';
+}
+
+/**
+ * メモリの表示領域を作成する
+ * @param {number} address 開始アドレス
+ * @param {Uint8Array} mem メモリの内容
+ * @param {number} length 表示上確保する長さ
+ */
+function set_memory( address, mem, length ) {
+    let memory = document.querySelector('#memory_view1');
+
+    for( let i=length-1; 0<=i; i-- ) {
+        let tr = document.createElement('tr');
+        let td1 = document.createElement('td');
+        td1.classList.add('address');
+        td1.innerText = padding16( address+i );
+        let td2 = document.createElement('td');
+        let memArea = document.createElement('span');
+        memArea.classList.add('mem_value');
+        memArea.setAttribute( 'type', 'text' );
+        memArea.setAttribute( 'id', "address" + padding16(i) );
+        //memArea.setAttribute( 'value',  padding8(mem[i]) );
+        memArea.innerText = padding8( mem[i] );
+        td2.appendChild(memArea);
+
+        tr.appendChild(td1);
+        tr.appendChild(td2);
+        memory.appendChild(tr);
+    }
+}
+
 const init_program = `#include <stdio.h>
 
 int main() {
@@ -367,7 +410,17 @@ class Scope {
     }
 }
 
-document.querySelector('#exec').addEventListener('click', () => {
+function waiting() {
+    return new Promise((resolve) => {
+        let dom = document.querySelector('#next');
+        console.log(dom);
+        dom.addEventListener('click',  () => {
+            console.log("resolved");
+            resolve();
+        }, { once: true });
+    });
+}
+document.querySelector('#exec').addEventListener('click',  async function() {
     let program = editor.getValue();
     //let ast = parser.parse( program );
     const models = {
@@ -382,7 +435,16 @@ document.querySelector('#exec').addEventListener('click', () => {
     let memory = new Memory(MEMORY_SIZE);
     let stack = new Stack(memory, MEMORY_SIZE);
     let mem_grobal = new Scope(null, null, stack);
+    set_memory( 0, memory.u8, MEMORY_SIZE );
 
+    memory.on( 0, MEMORY_SIZE, ( ad, sz, val ) => {
+        for( let add=ad; add<ad+(sz/8); add++ ) {
+            let val = memory.load( add, 8 );
+            let mem = document.querySelector( '#' + "address" + padding16(add) );
+            mem.innerText = padding8( val );
+            mem.classList.add( 'access' );
+        }
+    });
 
     //const source = fs.readFileSync( process.argv[2], "utf-8" );
     //let parser = pegjs.generate( ruleset );
@@ -408,6 +470,13 @@ document.querySelector('#exec').addEventListener('click', () => {
         // console.log( 106, stack.sp );
         //console.log( stack.get( stack.sp, 32 ) );
         // console.log( 108, stack.u32 );
+    }
+    func["debug"] =  async function(scope, argc) {
+        await waiting();
+        for( let add=0; add<MEMORY_SIZE; add++ ) {
+            let mem = document.querySelector( '#address' + padding16(add) );
+            mem.classList.remove('access');
+        }
     }
     func["pp"] = (scope, argc) => {
         console.log("pp", argc);
@@ -451,9 +520,9 @@ document.querySelector('#exec').addEventListener('click', () => {
         return output;
     }
 
-    function BinaryExpression(ast, scope) {
-        let left = interprit(ast["left"], scope);
-        let right = interprit(ast["right"], scope);
+    async function BinaryExpression(ast, scope) {
+        let left = await interprit(ast["left"], scope);
+        let right = await interprit(ast["right"], scope);
         let vartype = scope.gettype(ast["left"].name);
         let type = ast["left"]["type"];
         if (type == 'pointer') {
@@ -529,18 +598,18 @@ document.querySelector('#exec').addEventListener('click', () => {
      * @param {Scope} scope 変数のスコープ
      * @returns 実行結果
      */
-    function interprit(ast, scope) {
+    async function interprit(ast, scope) {
         //console.log( "ast", ast );
         switch (ast["type"]) {
             case "Program":
                 //console.log( 34, ast.body );
                 for (let line of ast.body) {
                     //console.log(359);
-                    interprit(line, scope);
+                    await interprit(line, scope);
                 }
                 break;
             case "ExpressionStatement":
-                return interprit(ast["expression"], scope);
+                return await interprit(ast["expression"], scope);
                 break;
             case "Include":
                 // console.log( 40, ast );
@@ -562,7 +631,7 @@ document.querySelector('#exec').addEventListener('click', () => {
                             // let dummy = scope.getvar( i.name );
                             // console.log( scope.getaddress(i.name) );
                             //console.log(382);
-                            let dummy = interprit(i, scope);
+                            let dummy = await (i, scope);
                             //if( DEVELOP ) 
                             // console.log( "FuncExec", i, dummy );
                             stack.push(dummy, 32);
@@ -589,7 +658,7 @@ document.querySelector('#exec').addEventListener('click', () => {
             case "FunctionDefinition":
                 //console.log( 52, ast["name"] );
                 //console.log( 53, ast.block );
-                func[ast["name"]] = (parent, param_num) => {
+                func[ast["name"]] = async function (parent, param_num){
                     //console.log( 263, parent );
                     let sc = new Scope(scope, parent, stack);
                     //console.log( 265, sc );
@@ -605,7 +674,7 @@ document.querySelector('#exec').addEventListener('click', () => {
                     }
                     // console.log( 156, sc.vars );
                     // console.log( 157, stack.get( 32, 32 ) );
-                    let result = interprit(ast.block, sc);
+                    let result = await interprit(ast.block, sc);
                     // console.log( 189, result );
                     return result;
                 }
@@ -615,7 +684,7 @@ document.querySelector('#exec').addEventListener('click', () => {
                 let block_result;
                 for (let line of ast.stmt) {
                     //console.log(434);
-                    block_result = interprit(line, scope);
+                    block_result = await interprit(line, scope);
                     // console.log( "block", block_result );
                 }
                 return block_result;
@@ -636,7 +705,7 @@ document.querySelector('#exec').addEventListener('click', () => {
                 if (ast["expr"]) {
                     // console.log( 154, ast["expr"]);
                     //console.log(456);
-                    let result = interprit(ast["expr"], scope);
+                    let result = await interprit(ast["expr"], scope);
                     // console.log( 201, result );
                     // console.log( 201, stack.u32 );
                     scope.setvar(ast["value"]["name"], result);
@@ -646,7 +715,7 @@ document.querySelector('#exec').addEventListener('click', () => {
                 break;
             case "AssignmentExpression":
                 //console.log(467, ast);
-                let result = interprit(ast["right"], scope);
+                let result = await interprit(ast["right"], scope);
                 if (ast["left"]["type"] == "array") {
                     let sub = ast["left"];
                     // console.log( 590, ast );
@@ -660,11 +729,11 @@ document.querySelector('#exec').addEventListener('click', () => {
                     console.log("arraydeep", sub["arraydeep"], scope.vars[name]["dimension"]);
                     for (; dim < sub["arraydeep"].length - 1; dim++) {
                         console.log("deep", sub["arraydeep"][dim]);
-                        let num = interprit(sub["arraydeep"][dim]["location"]);
+                        let num = await interprit(sub["arraydeep"][dim]["location"]);
                         seq += num * scope.vars[name]["dimension"][dim];
                     }
-                    seq += interprit(sub["arraydeep"][dim]["location"]);
-                    //let seq = interprit( sub["arraydeep"][0]["location"] );
+                    seq += await interprit(sub["arraydeep"][dim]["location"]);
+                    //let seq = await interprit( sub["arraydeep"][0]["location"] );
                     if (DEVELOP) console.log(389, name, scope.vars[name], size, sp, deep);
                     let dummy = memory.store(sp + (seq * size) / 8, size, result);
                     return dummy;
@@ -690,7 +759,7 @@ document.querySelector('#exec').addEventListener('click', () => {
                 break;
             case "returnStatement":
                 //console.log(490);
-                let dummy = interprit(ast["value"], scope);
+                let dummy = await interprit(ast["value"], scope);
                 // console.log( "retStat", ast["value"], dummy );
                 return dummy;
                 break;
@@ -698,7 +767,7 @@ document.querySelector('#exec').addEventListener('click', () => {
                 return BinaryExpression(ast, scope);
                 break;
             case "Identifier":
-                //console.log( "Identifier", ast );
+                console.log( "Identifier", ast );
                 let resi;
                 // console.log( "Identifier", scope.vars[ ast["name"] ] );
                 if (scope.vars[ast["name"]]["type"] == 'array') {
@@ -715,7 +784,7 @@ document.querySelector('#exec').addEventListener('click', () => {
                     let Pname = ast["expr"]["left"]["name"];
                     let Psize = scope.vars[Pname]["size"]
                     let address = scope.getvar(Pname);
-                    let aa = interprit(ast["expr"], scope);
+                    let aa = await interprit(ast["expr"], scope);
                     let Paddress = (aa - address) + address;
                     let res = memory.load(Paddress, Psize);
                     // console.log( "Po", Pname, aa, Psize, Paddress, aa - address );
@@ -734,7 +803,7 @@ document.querySelector('#exec').addEventListener('click', () => {
             case "array":
                 if (DEVELOP) console.log("array", ast);
                 if (ast["expr"]) {
-                    return interprit(ast["expr"], scope);
+                    return await interprit(ast["expr"], scope);
                 } else {
                     if (ast["model"]) {    // ast["model"]がある場合は配列定義
                         let length;
@@ -752,14 +821,14 @@ document.querySelector('#exec').addEventListener('click', () => {
                             //console.log( 595, ast["arraydeep"]["length"] );
                             length = 1;
                             for (let deep of ast["arraydeep"]) {
-                                let dim = interprit(deep["length"], scope);
+                                let dim = await interprit(deep["length"], scope);
                                 dimension.push(dim);
                                 //console.log( "deep", length, deep, dim, scope );
                                 length *= dim;
                             }
                             dimension = dimension.reverse();
                             add = calc_elms(dimension);
-                            //length = interprit( ast["arraydeep"]["length"], scope );
+                            //length = await interprit( ast["arraydeep"]["length"], scope );
                             //console.log( "array要素数あり", length, ast["arraydeep"] );
                         }
                         if (DEVELOP) console.log(362, length);
@@ -767,7 +836,7 @@ document.querySelector('#exec').addEventListener('click', () => {
                         scope.newarray(name, ast["model"], length, dimension, add);
                         if (ast["value"] && Array.isArray(ast["value"]["right"])) {
                             let rightArray = ast["value"]["right"].flat(Infinity);
-                            let values = rightArray.map(val => interprit(val));
+                            let values = rightArray.map(async function(val){ await interprit(val) });
                             let size = scope.vars[name].size;
                             let sp = scope.vars[name].sp;
                             for (let i in values) {
@@ -794,10 +863,10 @@ document.querySelector('#exec').addEventListener('click', () => {
                         console.log("arraydeep", ast["arraydeep"], scope.vars[name]["dimension"]);
                         for (; dim < ast["arraydeep"].length - 1; dim++) {
                             //console.log( "deep", ast["arraydeep"][dim] );
-                            let num = interprit(ast["arraydeep"][dim]["location"]);
+                            let num = await interprit(ast["arraydeep"][dim]["location"]);
                             seq += num * scope.vars[name]["add"][dim];
                         }
-                        seq += interprit(ast["arraydeep"][dim]["location"]);
+                        seq += await interprit(ast["arraydeep"][dim]["location"]);
                         if (DEVELOP) console.log(389, name, scope.vars[name], size, sp, deep);
                         let dummy = memory.load(sp + (seq * size) / 8, size);
                         return dummy;
@@ -806,25 +875,25 @@ document.querySelector('#exec').addEventListener('click', () => {
                 break;
             case "ForStatement":
                 //console.log( "For", ast );
-                interprit(ast["assign"], scope);
-                while (interprit(ast["condition"], scope)) {
-                    interprit(ast["block"], scope);
+                await (ast["assign"], scope);
+                while (await interprit(ast["condition"], scope)) {
+                    await interprit(ast["block"], scope);
                     //console.log( 598, ast["change"] );
-                    interprit(ast["change"], scope);
+                    await interprit(ast["change"], scope);
                 }
                 break;
             case "whileStatement":
-                while (interprit(ast["condition"], scope) != 0) {
-                    interprit(ast["block"], scope);
+                while (await interprit(ast["condition"], scope) != 0) {
+                    await interprit(ast["block"], scope);
                 }
                 break;
             case "ifStatement":
-                if (interprit(ast["condition"], scope) != 0) {
-                    interprit(ast["block"], scope);
+                if (await interprit(ast["condition"], scope) != 0) {
+                    await interprit(ast["block"], scope);
                 } else {
                     //console.log( "else", ast["else"] );
                     if (ast["else"]) {
-                        interprit(ast["else"]["block"], scope);
+                        await interprit(ast["else"]["block"], scope);
                     }
                 }
                 break;
@@ -837,10 +906,10 @@ document.querySelector('#exec').addEventListener('click', () => {
                     let sp = scope.vars[name].sp;
                     let address = memory.load(sp, size);
                     temp = memory.load(address, size);
-                    interprit(ast["post"], scope);
+                    await interprit(ast["post"], scope);
                 } else {
                     temp = scope.getvar(ast["post"]["left"]["name"]);
-                    let resultP = interprit(ast["post"], scope);
+                    let resultP = await interprit(ast["post"], scope);
                 }
                 //console.log( "resultP", resultP );
                 //console.log( "var", scope.getvar( ast["post"]["left"]["name"] ) );
@@ -849,7 +918,7 @@ document.querySelector('#exec').addEventListener('click', () => {
         }
     }
 
-    interprit(ast, mem_grobal);
+    await interprit(ast, mem_grobal);
     // console.log( 59, func["main"] );
     // console.log( 108, func );
     // stack.push( 0, 32 );
