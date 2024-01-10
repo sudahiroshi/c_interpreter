@@ -1,3 +1,19 @@
 #editor {
     height: 20em;
 }
+
+#program {
+    width: 60%;
+}
+
+#pc {
+
+}
+
+.flex {
+    display: flex;
+}
+
+.access {
+    background-color: #a29174;
+}

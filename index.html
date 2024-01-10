@@ -11,10 +11,24 @@
 </head>
 <body>
 
-    <div id="editor">
+    <div class="flex">
+    <div id="program">
+        <div id="editor"></div>
+        <button id="exec" value="実行">実行</button>
+        <button id="next">次へ</button>
+        <pre id="console"></pre>
     </div>
-    <button id="exec" value="実行">実行</button>
-    <pre id="console"></pre>
-
+    <div id="pc">
+        <table id="memory">
+            <caption>Memory</caption>
+            <!-- <thead>
+                <tr>
+                    <th colspan="2">Memory</th>
+                </tr>
+            </thead> -->
+            <tbody id="memory_view1"></tbody>
+        </table>
+    </div>
+</div>
 </body>
 </html>
