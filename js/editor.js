@@ -89,7 +89,30 @@ fetch("parser.pegjs")
     })
     .catch(err => {
         console.log('Error');
+    });
+
+function changeProgram( elm, url ) {
+    elm.addEventListener( 'click', () => {
+        let result = window.confirm( 'プログラムをロードして良いですか？（現在編集しているプログラムは消えます）' );
+        if( !result ) return;
+        fetch( url )
+        .then( res => {
+            if (!res.ok) {
+                throw new Error('Error: ' + res.status);
+            }
+            return res.text();
+        })
+        .then(text => {
+            editor.setValue( text );
+        })
+        .catch( err => {
+            console.log( url + "をロードできませんでした" );
+        })
     })
+}
+
+changeProgram( document.querySelector( '#program01'), 'web_example/program01.c')
+
 
 /**
  * メモリ空間を司るクラス
