@@ -619,10 +619,10 @@ function interprit( ast, scope ) {
                     console.log( "arraydeep", sub["arraydeep"], scope.vars[name]["dimension"] );
                     for( ; dim<sub["arraydeep"].length-1; dim++ ) {
                         console.log( "deep", sub["arraydeep"][dim] );
-                        let num = interprit( sub["arraydeep"][dim]["location"] );
+                        let num = interprit( sub["arraydeep"][dim]["location"], scope );
                         seq += num * scope.vars[name]["dimension"][dim];
                     }
-                    seq += interprit( sub["arraydeep"][dim]["location"] );
+                    seq += interprit( sub["arraydeep"][dim]["location"], scope );
                     //let seq = interprit( sub["arraydeep"][0]["location"] );
                     if( DEVELOP ) console.log( 389, name, scope.vars[name], size, sp, deep );
                     let dummy = memory.store( sp + (seq * size)/8, size, result );
@@ -726,7 +726,7 @@ function interprit( ast, scope ) {
                     scope.newarray( name, ast["model"], length, dimension, add );
                     if( ast["value"] && Array.isArray( ast["value"]["right"] ) ) {
                         let rightArray = ast["value"]["right"].flat(Infinity);
-                        let values = rightArray.map( val => interprit(val) );
+                        let values = rightArray.map( val => interprit(val, scope) );
                         let size = scope.vars[name].size;
                         let sp = scope.vars[name].sp;
                         for( let i in values ) {
@@ -753,10 +753,10 @@ function interprit( ast, scope ) {
                     console.log( "arraydeep", ast["arraydeep"], scope.vars[name]["dimension"] );
                     for( ; dim<ast["arraydeep"].length-1; dim++ ) {
                         //console.log( "deep", ast["arraydeep"][dim] );
-                        let num = interprit( ast["arraydeep"][dim]["location"] );
+                        let num = interprit( ast["arraydeep"][dim]["location"], scope );
                         seq += num * scope.vars[name]["add"][dim];
                     }
-                    seq += interprit( ast["arraydeep"][dim]["location"] );
+                    seq += interprit( ast["arraydeep"][dim]["location"], scope );
                     if( DEVELOP ) console.log( 389, name, scope.vars[name], size, sp, deep );
                     let dummy = memory.load( sp + (seq * size)/8, size );
                     return dummy;
