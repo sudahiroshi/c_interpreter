@@ -33,6 +33,7 @@ class Memory {
         this.access[16] = this.u16 = new Uint16Array( this.memory );
         this.access[32] = this.u32 = new Uint32Array( this.memory );
         this.access[64] = this.u64 = new BigUint64Array( this.memory );
+        this.event = [];
     }
 
     /**
@@ -804,6 +805,11 @@ function interprit( ast, scope ) {
             //console.log( "resultP", resultP );
             //console.log( "var", scope.getvar( ast["post"]["left"]["name"] ) );
             return temp;
+            break;
+        case "address":
+            let vaddress = scope.vars[ast["name"]].sp;
+            console.log("address", vaddress);
+            return vaddress;
             break;
     }
 }

@@ -939,6 +939,11 @@ document.querySelector('#exec').addEventListener('click',  async function() {
                 //console.log( "var", scope.getvar( ast["post"]["left"]["name"] ) );
                 return temp;
                 break;
+            case "address":
+                let vaddress = scope.vars[ast["name"]].sp;
+                console.log("address", vaddress);
+                return vaddress;
+                break;
         }
     }
 
