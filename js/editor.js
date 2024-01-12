@@ -631,7 +631,7 @@ document.querySelector('#exec').addEventListener('click',  async function() {
                             // let dummy = scope.getvar( i.name );
                             // console.log( scope.getaddress(i.name) );
                             //console.log(382);
-                            let dummy = await (i, scope);
+                            let dummy = await interprit(i, scope);
                             //if( DEVELOP ) 
                             // console.log( "FuncExec", i, dummy );
                             stack.push(dummy, 32);
@@ -769,7 +769,7 @@ document.querySelector('#exec').addEventListener('click',  async function() {
             case "Identifier":
                 console.log( "Identifier", ast );
                 let resi;
-                // console.log( "Identifier", scope.vars[ ast["name"] ] );
+                console.log( "Identifier", scope.vars[ ast["name"] ] );
                 if (scope.vars[ast["name"]]["type"] == 'array') {
                     resi = scope.getaddress(ast["name"]);
                 } else {
@@ -875,7 +875,7 @@ document.querySelector('#exec').addEventListener('click',  async function() {
                 break;
             case "ForStatement":
                 //console.log( "For", ast );
-                await (ast["assign"], scope);
+                await interprit(ast["assign"], scope);
                 while (await interprit(ast["condition"], scope)) {
                     await interprit(ast["block"], scope);
                     //console.log( 598, ast["change"] );
