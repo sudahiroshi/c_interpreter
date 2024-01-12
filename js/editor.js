@@ -729,10 +729,10 @@ document.querySelector('#exec').addEventListener('click',  async function() {
                     console.log("arraydeep", sub["arraydeep"], scope.vars[name]["dimension"]);
                     for (; dim < sub["arraydeep"].length - 1; dim++) {
                         console.log("deep", sub["arraydeep"][dim]);
-                        let num = await interprit(sub["arraydeep"][dim]["location"]);
+                        let num = await interprit(sub["arraydeep"][dim]["location"], scope);
                         seq += num * scope.vars[name]["dimension"][dim];
                     }
-                    seq += await interprit(sub["arraydeep"][dim]["location"]);
+                    seq += await interprit(sub["arraydeep"][dim]["location"], scope);
                     //let seq = await interprit( sub["arraydeep"][0]["location"] );
                     if (DEVELOP) console.log(389, name, scope.vars[name], size, sp, deep);
                     let dummy = memory.store(sp + (seq * size) / 8, size, result);
@@ -769,6 +769,7 @@ document.querySelector('#exec').addEventListener('click',  async function() {
             case "Identifier":
                 console.log( "Identifier", ast );
                 let resi;
+                console.log( "Identifier", scope.vars );
                 console.log( "Identifier", scope.vars[ ast["name"] ] );
                 if (scope.vars[ast["name"]]["type"] == 'array') {
                     resi = scope.getaddress(ast["name"]);
@@ -836,7 +837,7 @@ document.querySelector('#exec').addEventListener('click',  async function() {
                         scope.newarray(name, ast["model"], length, dimension, add);
                         if (ast["value"] && Array.isArray(ast["value"]["right"])) {
                             let rightArray = ast["value"]["right"].flat(Infinity);
-                            let values = rightArray.map(async function(val){ await interprit(val) });
+                            let values = rightArray.map(async function(val){ await interprit(val, scope ) });
                             let size = scope.vars[name].size;
                             let sp = scope.vars[name].sp;
                             for (let i in values) {
@@ -863,10 +864,10 @@ document.querySelector('#exec').addEventListener('click',  async function() {
                         console.log("arraydeep", ast["arraydeep"], scope.vars[name]["dimension"]);
                         for (; dim < ast["arraydeep"].length - 1; dim++) {
                             //console.log( "deep", ast["arraydeep"][dim] );
-                            let num = await interprit(ast["arraydeep"][dim]["location"]);
+                            let num = await interprit(ast["arraydeep"][dim]["location"], scope);
                             seq += num * scope.vars[name]["add"][dim];
                         }
-                        seq += await interprit(ast["arraydeep"][dim]["location"]);
+                        seq += await interprit(ast["arraydeep"][dim]["location"], scope );
                         if (DEVELOP) console.log(389, name, scope.vars[name], size, sp, deep);
                         let dummy = memory.load(sp + (seq * size) / 8, size);
                         return dummy;
