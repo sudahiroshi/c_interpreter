@@ -864,7 +864,12 @@ document.querySelector('#exec').addEventListener('click',  async function() {
                         scope.newarray(name, ast["model"], length, dimension, add);
                         if (ast["value"] && Array.isArray(ast["value"]["right"])) {
                             let rightArray = ast["value"]["right"].flat(Infinity);
-                            let values = rightArray.map(async function(val){ await interprit(val, scope ) });
+                            let resultPromise = [];
+                            for( let rightElement of rightArray ) {
+                                resultPromise.push( interprit( rightElement, scope ) );
+                            }
+                            let values = await Promise.all( resultPromise );
+                            //let values = await Promise.all( rightArray.map(async function(val){ await interprit(val, scope ) }));
                             let size = scope.vars[name].size;
                             let sp = scope.vars[name].sp;
                             for (let i in values) {
