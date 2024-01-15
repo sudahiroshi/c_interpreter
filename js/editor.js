@@ -52,6 +52,7 @@ int main() {
     while( a<10 ) {
         print( a );
         a = a + 1;
+        debug();
     }
 }`
 
@@ -111,8 +112,11 @@ function changeProgram( elm, url ) {
     })
 }
 
-changeProgram( document.querySelector( '#program01'), 'web_example/program01.c')
-
+changeProgram( document.querySelector( '#program01'), 'web_example/variable.c')
+changeProgram( document.querySelector( '#program02'), 'web_example/arrayprogram.c')
+changeProgram( document.querySelector( '#program03'), 'web_example/pointerprogram.c')
+changeProgram( document.querySelector( '#program04'), 'web_example/function.c')
+changeProgram( document.querySelector( '#program05'), 'web_example/dimension.c')
 
 /**
  * メモリ空間を司るクラス
