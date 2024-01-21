@@ -505,15 +505,17 @@ document.querySelector('#exec').addEventListener('click',  async function() {
         // console.log( 108, stack.u32 );
     }
     func["debug"] =  async function(scope, argc) {
-        console.log( "debug0", stack.get( stack.sp,32), stack.get(stack.sp+4,32));
+        //console.log( "debug0", stack.get( stack.sp,32), stack.get(stack.sp+4,32));
         let lineno = Math.trunc(stack.get( stack.sp, 32 ) / 256);
-        console.log( "debug1", lineno );
+        //console.log( "debug1", lineno );
         let col = editor.getModel().getLineMaxColumn(lineno);
         let range = new monaco.Range(lineno, 1, lineno, col);
-        console.log( "debug", lineno, col, range );
+        //console.log( "debug", lineno, col, range );
         editor.setSelection(range);
 
+        document.querySelector('#next').disabled = false;
         await waiting();
+        document.querySelector('#next').disabled = true;
         for( let add=0; add<MEMORY_SIZE; add++ ) {
             let mem = document.querySelector( '#address' + padding16(add) );
             mem.classList.remove('access');
