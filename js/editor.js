@@ -38,9 +38,14 @@ function set_memory( address, mem, length ) {
         //memArea.setAttribute( 'value',  padding8(mem[i]) );
         memArea.innerText = padding8( mem[i] );
         td2.appendChild(memArea);
+        let td3 = document.createElement('td');
+        let valArea = document.createElement('span');
+        valArea.setAttribute( 'id', 'val_address' + padding16(i) );
+        td3.appendChild(valArea);
 
         tr.appendChild(td1);
         tr.appendChild(td2);
+        tr.appendChild(td3);
         memory.appendChild(tr);
     }
 }
@@ -291,6 +296,7 @@ class Scope {
         // console.log( "newvar", val, this.vars[name]["size"] );
         this.stack.push(val, this.vars[name]["size"]);
         this.vars[name]["sp"] = this.stack.sp;
+
         // console.log( 80, name, this.vars[name], stack.sp );
     }
     /**
@@ -499,6 +505,14 @@ document.querySelector('#exec').addEventListener('click',  async function() {
         // console.log( 108, stack.u32 );
     }
     func["debug"] =  async function(scope, argc) {
+        console.log( "debug0", stack.get( stack.sp,32), stack.get(stack.sp+4,32));
+        let lineno = Math.trunc(stack.get( stack.sp, 32 ) / 256);
+        console.log( "debug1", lineno );
+        let col = editor.getModel().getLineMaxColumn(lineno);
+        let range = new monaco.Range(lineno, 1, lineno, col);
+        console.log( "debug", lineno, col, range );
+        editor.setSelection(range);
+
         await waiting();
         for( let add=0; add<MEMORY_SIZE; add++ ) {
             let mem = document.querySelector( '#address' + padding16(add) );
